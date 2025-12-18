@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { WelcomeScreen } from "./WelcomeScreen";
-import { streamChat } from "@/lib/api";
-import type { Message, ToolCall } from "@/types/chat";
+import { streamChat } from "../lib/api";
+import type { Message, ToolCall } from "../types/chat";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 15);

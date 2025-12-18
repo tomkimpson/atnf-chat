@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Telescope, Github, ExternalLink, Key } from "lucide-react";
-import { getCatalogueInfo } from "@/lib/api";
+import { getCatalogueInfo } from "../lib/api";
 
 interface HeaderProps {
   hasApiKey: boolean;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { ApiKeyModal, Chat, Header } from "@/components";
-import { useApiKey } from "@/lib/useApiKey";
+import { ApiKeyModal, Chat, Header } from "../components";
+import { useApiKey } from "../lib/useApiKey";
 
 export default function Home() {
   const { apiKey, setApiKey, hasApiKey, maskedKey, isLoaded } = useApiKey();
