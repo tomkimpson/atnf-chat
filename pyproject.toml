@@ -56,10 +56,10 @@ dev = [
 atnf-chat = "atnf_chat.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/tkimpson/atnf-chat"
-Documentation = "https://github.com/tkimpson/atnf-chat#readme"
-Repository = "https://github.com/tkimpson/atnf-chat"
-Issues = "https://github.com/tkimpson/atnf-chat/issues"
+Homepage = "https://github.com/tomkimpson/atnf-chat"
+Documentation = "https://github.com/tomkimpson/atnf-chat#readme"
+Repository = "https://github.com/tomkimpson/atnf-chat"
+Issues = "https://github.com/tomkimpson/atnf-chat/issues"
 
 [build-system]
 requires = ["hatchling"]

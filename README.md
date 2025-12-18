@@ -23,7 +23,7 @@ analyses through conversational interactions rather than SQL queries or Python s
 
 1. **Clone and install dependencies:**
    ```bash
-   git clone https://github.com/tkimpson/atnf-chat.git
+   git clone https://github.com/tomkimpson/atnf-chat.git
    cd atnf-chat
    pip install -e ".[dev]"
    ```
@@ -83,7 +83,7 @@ For self-hosted deployment on any VPS (DigitalOcean, Linode, etc.):
 
 ```bash
 # Clone repository
-git clone https://github.com/tkimpson/atnf-chat.git
+git clone https://github.com/tomkimpson/atnf-chat.git
 cd atnf-chat
 
 # Build and run
