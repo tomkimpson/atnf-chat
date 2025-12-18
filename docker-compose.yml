@@ -1,0 +1,56 @@
+# ATNF-Chat Docker Compose Configuration
+# Run with: docker compose up
+
+services:
+  # Python FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atnf-chat-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - LOG_LEVEL=INFO
+      # Note: API key is provided by users in the frontend,
+      # not stored server-side
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://backend:8000
+    container_name: atnf-chat-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+# For production with external access, add a reverse proxy:
+#
+#   nginx:
+#     image: nginx:alpine
+#     ports:
+#       - "80:80"
+#       - "443:443"
+#     volumes:
+#       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+#     depends_on:
+#       - frontend
+#       - backend

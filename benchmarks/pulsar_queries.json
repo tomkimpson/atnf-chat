@@ -1,0 +1,428 @@
+{
+  "version": "1.0.0",
+  "description": "LLM accuracy benchmark suite for ATNF-Chat",
+  "target_performance": {
+    "easy": 0.95,
+    "medium": 0.85,
+    "hard": 0.70,
+    "failure_handling": 0.90
+  },
+  "test_cases": [
+    {
+      "id": "easy_001",
+      "query": "What is the period of the Vela pulsar?",
+      "difficulty": "easy",
+      "expected_tool_calls": ["get_pulsar_info"],
+      "expected_pulsar": "J0835-4510",
+      "expected_parameter": "P0",
+      "expected_answer_contains": ["0.089", "89", "millisecond"],
+      "validation": {
+        "must_include_value": true,
+        "must_include_unit": true
+      }
+    },
+    {
+      "id": "easy_002",
+      "query": "How many pulsars are in the catalogue?",
+      "difficulty": "easy",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_answer_type": "integer",
+      "validation": {
+        "result_count_range": [3000, 4000]
+      }
+    },
+    {
+      "id": "easy_003",
+      "query": "Show me the Crab pulsar",
+      "difficulty": "easy",
+      "expected_tool_calls": ["get_pulsar_info"],
+      "expected_pulsar": "J0534+2200",
+      "alternate_names": ["B0531+21", "Crab"],
+      "validation": {
+        "must_return_pulsar_data": true
+      }
+    },
+    {
+      "id": "easy_004",
+      "query": "List 5 pulsars with their periods",
+      "difficulty": "easy",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "select_fields_must_include": ["JNAME", "P0"],
+        "limit_range": [5, 10]
+      },
+      "validation": {
+        "result_count_range": [5, 10]
+      }
+    },
+    {
+      "id": "easy_005",
+      "query": "What is the dispersion measure of PSR J0437-4715?",
+      "difficulty": "easy",
+      "expected_tool_calls": ["get_pulsar_info"],
+      "expected_parameter": "DM",
+      "expected_answer_contains": ["2.64", "pc"],
+      "validation": {
+        "must_include_value": true
+      }
+    },
+    {
+      "id": "medium_001",
+      "query": "Show me all millisecond pulsars",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "P0",
+          "must_have_cmp": "lt",
+          "value_range": [0.01, 0.03]
+        }
+      },
+      "validation": {
+        "result_count_range": [300, 600],
+        "all_results_satisfy": "P0 < 0.03"
+      }
+    },
+    {
+      "id": "medium_002",
+      "query": "How many millisecond pulsars are in 47 Tucanae?",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "op": "and",
+          "clauses_must_include": [
+            {"field": "P0", "cmp": "lt"},
+            {"field": "ASSOC", "cmp": "contains", "value_contains": ["47", "Tuc"]}
+          ]
+        }
+      },
+      "expected_answer_type": "integer",
+      "validation": {
+        "result_count_range": [20, 40]
+      }
+    },
+    {
+      "id": "medium_003",
+      "query": "Find binary pulsars with orbital periods less than 1 day",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "op": "and",
+          "clauses_must_include": [
+            {"field": "PB", "cmp": "lt", "value": 1.0}
+          ]
+        }
+      },
+      "validation": {
+        "all_results_satisfy": "PB < 1.0"
+      }
+    },
+    {
+      "id": "medium_004",
+      "query": "Show me pulsars with periods around 1.4 milliseconds",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "P0",
+          "must_have_cmp": "in_range",
+          "value_approximately": [0.0013, 0.0015]
+        }
+      },
+      "validation": {
+        "all_results_satisfy": "P0 > 0.001 and P0 < 0.002"
+      }
+    },
+    {
+      "id": "medium_005",
+      "query": "What's the average period of all pulsars?",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue", "statistical_analysis"],
+      "expected_parameters": ["P0"],
+      "validation": {
+        "must_include_statistic": "mean"
+      }
+    },
+    {
+      "id": "medium_006",
+      "query": "Show pulsars with DM greater than 500",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "DM",
+          "must_have_cmp": "gt",
+          "value": 500
+        }
+      },
+      "validation": {
+        "all_results_satisfy": "DM > 500"
+      }
+    },
+    {
+      "id": "medium_007",
+      "query": "Find pulsars associated with supernova remnants",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "ASSOC",
+          "must_have_cmp": "contains",
+          "value_contains": ["SNR"]
+        }
+      },
+      "validation": {
+        "result_count_range": [50, 200]
+      }
+    },
+    {
+      "id": "hard_001",
+      "query": "Compare the magnetic field distribution of recycled vs normal pulsars",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue", "compute_derived_parameter", "statistical_analysis"],
+      "expected_parameters": ["P0", "P1", "BSURF"],
+      "expected_derived": "BSURF",
+      "expected_provenance": {
+        "source": "atnf_native"
+      },
+      "validation": {
+        "must_show_comparison": true,
+        "must_report_statistics": true,
+        "must_document_assumptions": true
+      }
+    },
+    {
+      "id": "hard_002",
+      "query": "Is there a correlation between period and DM for millisecond pulsars?",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue", "correlation_analysis"],
+      "expected_parameters": ["P0", "DM"],
+      "validation": {
+        "must_report_correlation": true,
+        "must_report_significance": true,
+        "must_interpret_result": true
+      }
+    },
+    {
+      "id": "hard_003",
+      "query": "What fraction of pulsars have measured proper motions?",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_parameters": ["PMRA", "PMDEC"],
+      "validation": {
+        "must_report_completeness": true,
+        "must_handle_nulls": true
+      }
+    },
+    {
+      "id": "hard_004",
+      "query": "Find the youngest pulsars based on characteristic age",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue", "compute_derived_parameter"],
+      "expected_derived": "AGE",
+      "expected_dsl": {
+        "order_by": "AGE",
+        "order_desc": false
+      },
+      "validation": {
+        "must_document_formula": true,
+        "must_note_assumptions": true
+      }
+    },
+    {
+      "id": "hard_005",
+      "query": "Calculate the spin-down luminosity for all pulsars with measured period derivatives and show the distribution",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue", "compute_derived_parameter", "statistical_analysis"],
+      "expected_derived": "EDOT",
+      "validation": {
+        "must_prefer_atnf_native": true,
+        "must_report_completeness": true,
+        "must_show_distribution": true
+      }
+    }
+  ],
+  "failure_case_tests": [
+    {
+      "id": "fail_001",
+      "query": "Show me pulsars with spin-down ages",
+      "test_type": "ambiguous_term",
+      "difficulty": "medium",
+      "expected_behavior": "clarifying_question",
+      "expected_clarification_topics": [
+        "characteristic age",
+        "P/2Pdot",
+        "assumptions",
+        "braking index"
+      ],
+      "validation": {
+        "must_ask_clarification": true,
+        "must_not_assume": true
+      }
+    },
+    {
+      "id": "fail_002",
+      "query": "Plot DM vs period for all pulsars with measured braking index",
+      "test_type": "missingness_handling",
+      "difficulty": "hard",
+      "expected_behavior": "execute_with_warning",
+      "expected_warning_topics": [
+        "braking index",
+        "only ~10 pulsars",
+        "sparse",
+        "limited"
+      ],
+      "validation": {
+        "must_warn_about_missingness": true,
+        "must_report_count": true
+      }
+    },
+    {
+      "id": "fail_003",
+      "query": "Show me all pulsars with orbital periods less than 1 hour",
+      "test_type": "empty_result",
+      "difficulty": "easy",
+      "expected_behavior": "graceful_failure",
+      "expected_response_contains": ["no pulsars", "no results", "none found"],
+      "expected_suggestions": [
+        "relax",
+        "shortest known",
+        "minimum orbital"
+      ],
+      "validation": {
+        "must_handle_empty": true,
+        "must_suggest_alternative": true
+      }
+    },
+    {
+      "id": "fail_004",
+      "query": "Give me everything about J0737-3039",
+      "test_type": "overly_broad",
+      "difficulty": "medium",
+      "expected_behavior": "focused_response",
+      "expected_response_contains": [
+        "double pulsar",
+        "key parameters"
+      ],
+      "expected_offer_to_focus": true,
+      "validation": {
+        "must_summarize": true,
+        "must_offer_focus_options": true
+      }
+    },
+    {
+      "id": "fail_005",
+      "query": "Find energetic pulsars",
+      "test_type": "vague_term",
+      "difficulty": "medium",
+      "expected_behavior": "clarifying_question",
+      "expected_clarification_options": [
+        "spin-down luminosity",
+        "Edot",
+        "magnetic field",
+        "young age"
+      ],
+      "validation": {
+        "must_ask_clarification": true,
+        "must_offer_interpretations": true
+      }
+    },
+    {
+      "id": "fail_006",
+      "query": "Find all pulsars discovered in the last 2 years",
+      "test_type": "unsupported_query",
+      "difficulty": "medium",
+      "expected_behavior": "clarifying_question",
+      "expected_clarification": [
+        "discovery date not tracked",
+        "reference epoch",
+        "alternative approaches"
+      ],
+      "validation": {
+        "must_explain_limitation": true,
+        "must_suggest_alternative": true
+      }
+    },
+    {
+      "id": "fail_007",
+      "query": "Show me the rotational period of pulsar XYZ-999",
+      "test_type": "not_found",
+      "difficulty": "easy",
+      "expected_behavior": "graceful_failure",
+      "expected_response_contains": ["not found", "no match", "doesn't exist"],
+      "validation": {
+        "must_handle_not_found": true,
+        "must_suggest_search": true
+      }
+    },
+    {
+      "id": "fail_008",
+      "query": "What is the mass of all pulsars?",
+      "test_type": "high_missingness",
+      "difficulty": "medium",
+      "expected_behavior": "execute_with_warning",
+      "expected_warning_topics": [
+        "mass",
+        "limited measurements",
+        "binary",
+        "completeness"
+      ],
+      "validation": {
+        "must_warn_about_missingness": true,
+        "must_report_percentage": true
+      }
+    }
+  ],
+  "dsl_compliance_tests": [
+    {
+      "id": "dsl_001",
+      "description": "Simple less-than filter",
+      "input_query": "Pulsars with period less than 10ms",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "P0",
+        "filters.clauses[0].cmp": "lt",
+        "filters.clauses[0].value": 0.01
+      }
+    },
+    {
+      "id": "dsl_002",
+      "description": "String contains filter",
+      "input_query": "Pulsars in globular clusters",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "ASSOC",
+        "filters.clauses[0].cmp": "contains"
+      }
+    },
+    {
+      "id": "dsl_003",
+      "description": "Range filter",
+      "input_query": "Pulsars with DM between 50 and 100",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "DM",
+        "filters.clauses[0].cmp": "in_range",
+        "filters.clauses[0].value[0]": 50,
+        "filters.clauses[0].value[1]": 100
+      }
+    },
+    {
+      "id": "dsl_004",
+      "description": "Not null filter",
+      "input_query": "Pulsars with measured distances",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "DIST",
+        "filters.clauses[0].cmp": "not_null"
+      }
+    },
+    {
+      "id": "dsl_005",
+      "description": "Compound AND filter",
+      "input_query": "Millisecond pulsars in binaries",
+      "expected_dsl_pattern": {
+        "filters.op": "and",
+        "filters.clauses_count": 2
+      }
+    }
+  ]
+}

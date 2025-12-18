@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.eggs
+*.egg-info
+.installed.cfg
+*.egg
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+.tox
+.nox
+.hypothesis
+
+# Virtual environments
+venv
+.venv
+env
+ENV
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+.env
+.env.local
+*.log
+.beads
+
+# Documentation
+*.md
+!README.md
+
+# Tests (not needed in production image)
+tests/
+benchmarks/
+
+# Frontend (has its own Dockerfile)
+frontend/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
