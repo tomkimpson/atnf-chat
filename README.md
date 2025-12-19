@@ -1,21 +1,27 @@
 # ATNF-Chat
 
-LLM-Powered Conversational Interface for ATNF Pulsar Catalogue Queries.
+A RAG-powered conversational interface for querying the ATNF Pulsar Catalogue.
 
 ## Overview
 
-ATNF-Chat provides a natural language interface to the ATNF Pulsar Catalogue,
-enabling researchers to query pulsar data, generate visualizations, and perform
-analyses through conversational interactions rather than SQL queries or Python scripts.
+ATNF-Chat uses **Retrieval-Augmented Generation (RAG)** to provide accurate, grounded answers about pulsars. Unlike a simple LLM wrapper, every response is backed by real data retrieved from the ATNF Pulsar Catalogue.
+
+**How it works:**
+1. You ask a question in natural language (e.g., "What are the fastest spinning pulsars?")
+2. The LLM translates your question into a structured query
+3. The query executes against the live ATNF catalogue (~3800+ pulsars)
+4. Results are returned to the LLM, which synthesizes a grounded response
+
+This means you get the convenience of natural language with the accuracy of direct database queries - no hallucinated pulsar data.
 
 ## Features
 
+- **Grounded Responses**: Every answer is backed by real catalogue data, not LLM training data
 - **Natural Language Queries**: Ask questions in plain English
-- **Validated Query DSL**: Type-safe query construction with pre-execution validation
-- **Scientific Safety**: Explicit null handling, provenance tracking, and data quality warnings
-- **ATNF-Native Preference**: Uses official derived parameters when available
-- **Reproducible**: All queries exportable as validated Python code
+- **Live Data Access**: Queries the current ATNF catalogue via psrqpy
 - **Interactive Visualizations**: P-Pdot diagrams, sky maps, and more with Plotly
+- **Scientific Safety**: Explicit null handling and data quality warnings
+- **Reproducible**: All queries exportable as validated Python code
 
 ## Quick Start
 
