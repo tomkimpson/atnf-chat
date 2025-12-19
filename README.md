@@ -52,52 +52,26 @@ This starts both the backend (port 8000) and frontend (port 3000).
 
 ## Deployment
 
-### Option 1: Vercel + Railway (Recommended)
-
-This is the simplest deployment for public access.
+The app is deployed using **Vercel** (frontend) and **Railway** (backend).
 
 **Frontend (Vercel):**
 
-1. Push your code to GitHub
-2. Import the repository in [Vercel](https://vercel.com)
-3. Set the root directory to `frontend`
-4. Add environment variable:
-   - `NEXT_PUBLIC_API_URL`: Your Railway backend URL (e.g., `https://atnf-chat-backend.up.railway.app`)
-5. Deploy
+1. Import the repository in [Vercel](https://vercel.com)
+2. Set the root directory to `frontend`
+3. Add environment variable:
+   - `NEXT_PUBLIC_API_URL`: Your Railway backend URL
+4. Deploy
 
 **Backend (Railway):**
 
 1. Create a new project in [Railway](https://railway.app)
 2. Connect your GitHub repository
-3. Set the root directory to `/` (project root)
-4. Railway auto-detects the Dockerfile
-5. Add environment variables:
+3. Railway auto-detects the Dockerfile
+4. Add environment variables:
    - `ENVIRONMENT`: `production`
    - `API_HOST`: `0.0.0.0`
    - `API_PORT`: `8000`
-6. Deploy
-
-### Option 2: Docker on VPS
-
-For self-hosted deployment on any VPS (DigitalOcean, Linode, etc.):
-
-```bash
-# Clone repository
-git clone https://github.com/tomkimpson/atnf-chat.git
-cd atnf-chat
-
-# Build and run
-docker compose up -d --build
-
-# View logs
-docker compose logs -f
-```
-
-Add a reverse proxy (nginx/Caddy) for HTTPS.
-
-### Option 3: Single Platform (Railway/Render)
-
-Both frontend and backend can be deployed on Railway or Render as separate services within one project. This simplifies management but may have slightly higher latency for the frontend.
+5. Deploy
 
 ## Configuration
 
