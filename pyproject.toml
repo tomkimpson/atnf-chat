@@ -24,6 +24,7 @@ dependencies = [
     "numpy>=1.24",
     "astropy>=6.0",
     "scipy>=1.11",
+    "tabulate>=0.9",  # Required for pandas.DataFrame.to_markdown()
     # Validation
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
