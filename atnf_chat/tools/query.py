@@ -211,12 +211,14 @@ def query_catalogue(
 def get_pulsar_info(
     name: str,
     catalogue: CatalogueInterface | None = None,
+    fields: list[str] | None = None,
 ) -> QueryResult:
     """Get detailed information about a specific pulsar.
 
     Args:
         name: Pulsar name (JNAME, BNAME, or partial match)
         catalogue: CatalogueInterface instance (uses singleton if None)
+        fields: Optional list of specific fields to return
 
     Returns:
         QueryResult with pulsar data
@@ -251,6 +253,12 @@ def get_pulsar_info(
 
     # Convert Series to DataFrame for consistent interface
     df = pd.DataFrame([pulsar])
+
+    # Filter to specific fields if requested
+    if fields:
+        available = [f for f in fields if f in df.columns]
+        if available:
+            df = df[available]
 
     return QueryResult(
         success=True,
