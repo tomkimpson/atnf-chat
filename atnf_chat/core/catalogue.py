@@ -550,28 +550,38 @@ class CatalogueInterface:
         """Get a single pulsar by name.
 
         Args:
-            name: Pulsar name (JNAME or BNAME)
+            name: Pulsar name (JNAME, BNAME, or common name like 'Vela', 'Crab')
 
         Returns:
             Series with pulsar data, or None if not found
         """
         df = self.dataframe
 
-        # Try JNAME first
+        # Try JNAME first (exact match)
         if "JNAME" in df.columns:
             matches = df[df["JNAME"] == name]
             if len(matches) == 1:
                 return matches.iloc[0]
 
-        # Try BNAME
+        # Try BNAME (exact match)
         if "BNAME" in df.columns:
             matches = df[df["BNAME"] == name]
             if len(matches) == 1:
                 return matches.iloc[0]
 
-        # Try partial match
+        # Try partial match on JNAME
         if "JNAME" in df.columns:
             matches = df[df["JNAME"].str.contains(name, case=False, na=False)]
+            if len(matches) == 1:
+                return matches.iloc[0]
+
+        # Try searching ASSOC_ORIG for common names (e.g., "Vela", "Crab")
+        # These appear as "SNR:Vela" or "SNR:Crab" in the associations
+        if "ASSOC_ORIG" in df.columns:
+            # Search for the name as a word boundary in associations
+            # This matches "SNR:Vela" but not "VelaX" in other contexts
+            pattern = rf"(?:^|[,:]){name}(?:[,\[]|$)"
+            matches = df[df["ASSOC_ORIG"].str.contains(pattern, case=False, na=False, regex=True)]
             if len(matches) == 1:
                 return matches.iloc[0]
 
@@ -583,6 +593,9 @@ class CatalogueInterface:
         limit: int = 10,
     ) -> pd.DataFrame:
         """Search for pulsars by name pattern.
+
+        Searches JNAME, BNAME, and ASSOC_ORIG columns for matches.
+        This allows finding pulsars by common names like "Vela" or "Crab".
 
         Args:
             name_pattern: Pattern to search for
@@ -605,6 +618,13 @@ class CatalogueInterface:
         if "BNAME" in df.columns:
             matches = df[
                 df["BNAME"].str.contains(name_pattern, case=False, na=False)
+            ]
+            results.append(matches)
+
+        # Search ASSOC_ORIG for common names (e.g., "Vela", "Crab")
+        if "ASSOC_ORIG" in df.columns:
+            matches = df[
+                df["ASSOC_ORIG"].str.contains(name_pattern, case=False, na=False)
             ]
             results.append(matches)
 
