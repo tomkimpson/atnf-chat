@@ -40,6 +40,7 @@ export default function Home() {
           key={chatKey}
           apiKey={apiKey}
           onApiKeyNeeded={() => setShowApiKeyModal(true)}
+          serverHasApiKey={serverHasApiKey}
         />
       </main>
 

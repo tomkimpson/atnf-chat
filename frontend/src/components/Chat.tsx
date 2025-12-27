@@ -14,9 +14,10 @@ function generateId(): string {
 interface ChatProps {
   apiKey: string;
   onApiKeyNeeded: () => void;
+  serverHasApiKey?: boolean;
 }
 
-export function Chat({ apiKey, onApiKeyNeeded }: ChatProps) {
+export function Chat({ apiKey, onApiKeyNeeded, serverHasApiKey = false }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -30,8 +31,8 @@ export function Chat({ apiKey, onApiKeyNeeded }: ChatProps) {
   }, [messages, scrollToBottom]);
 
   const handleSend = async (content: string) => {
-    // Check if API key is set
-    if (!apiKey) {
+    // Check if API key is available (user-provided or server-side)
+    if (!apiKey && !serverHasApiKey) {
       onApiKeyNeeded();
       return;
     }
