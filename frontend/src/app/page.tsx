@@ -5,12 +5,21 @@ import { ApiKeyModal, Chat, Header } from "../components";
 import { useApiKey } from "../lib/useApiKey";
 
 export default function Home() {
-  const { apiKey, setApiKey, hasApiKey, maskedKey, isLoaded } = useApiKey();
+  const {
+    apiKey,
+    setApiKey,
+    hasApiKey,
+    maskedKey,
+    isLoaded,
+    serverHasApiKey,
+    isApiKeyRequired,
+    rateLimitPerMinute,
+  } = useApiKey();
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [chatKey, setChatKey] = useState(0);
 
-  // Show modal automatically if no API key is set (after loading)
-  const shouldPromptForKey = isLoaded && !hasApiKey;
+  // Only prompt for key if server doesn't have one and user hasn't provided one
+  const shouldPromptForKey = isLoaded && isApiKeyRequired;
 
   // Reset chat by changing key to force remount
   const handleLogoClick = useCallback(() => {
@@ -24,6 +33,7 @@ export default function Home() {
         maskedKey={maskedKey}
         onApiKeyClick={() => setShowApiKeyModal(true)}
         onLogoClick={handleLogoClick}
+        serverHasApiKey={serverHasApiKey}
       />
       <main className="flex-1 overflow-hidden">
         <Chat
@@ -38,6 +48,8 @@ export default function Home() {
         onClose={() => setShowApiKeyModal(false)}
         onSave={setApiKey}
         currentKey={apiKey}
+        isOptional={serverHasApiKey}
+        rateLimitPerMinute={rateLimitPerMinute}
       />
     </div>
   );
