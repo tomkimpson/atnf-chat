@@ -60,8 +60,8 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     max_api_calls_per_minute: int = Field(
-        default=60,
-        description="Maximum API calls per minute",
+        default=20,
+        description="Maximum API calls per minute per IP (when using server key)",
     )
     max_tokens_per_request: int = Field(
         default=4096,

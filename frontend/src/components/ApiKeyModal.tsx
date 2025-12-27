@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Key, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { X, Key, ExternalLink, Eye, EyeOff, Zap } from "lucide-react";
 
 interface ApiKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (apiKey: string) => void;
   currentKey: string;
+  isOptional?: boolean;
+  rateLimitPerMinute?: number;
 }
 
 export function ApiKeyModal({
@@ -15,6 +17,8 @@ export function ApiKeyModal({
   onClose,
   onSave,
   currentKey,
+  isOptional = false,
+  rateLimitPerMinute = 0,
 }: ApiKeyModalProps) {
   const [apiKey, setApiKey] = useState(currentKey);
   const [showKey, setShowKey] = useState(false);
@@ -30,8 +34,13 @@ export function ApiKeyModal({
     onClose();
   };
 
+  const handleSkip = () => {
+    onSave(""); // Clear any existing key
+    onClose();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && apiKey.trim()) {
+    if (e.key === "Enter" && (apiKey.trim() || isOptional)) {
       handleSave();
     } else if (e.key === "Escape") {
       onClose();
@@ -54,7 +63,12 @@ export function ApiKeyModal({
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
               <Key className="h-5 w-5 text-blue-600" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">API Key</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">API Key</h2>
+              {isOptional && (
+                <span className="text-xs font-medium text-green-600">Optional</span>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -65,10 +79,31 @@ export function ApiKeyModal({
         </div>
 
         {/* Description */}
-        <p className="mb-4 text-sm text-gray-600">
-          Enter your Anthropic API key to use ATNF-Chat. Your key is stored
-          locally in your browser and sent directly to Anthropic.
-        </p>
+        {isOptional ? (
+          <div className="mb-4 space-y-3">
+            <div className="flex items-start gap-2 rounded-lg bg-green-50 p-3">
+              <Zap className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
+              <p className="text-sm text-green-800">
+                <strong>Ready to use!</strong> This app has a built-in API key, so you can
+                start chatting immediately without providing your own.
+              </p>
+            </div>
+            <p className="text-sm text-gray-600">
+              Want to use your own API key? Enter it below for higher rate limits
+              and to use your own Anthropic account.
+              {rateLimitPerMinute > 0 && (
+                <span className="block mt-1 text-xs text-gray-500">
+                  Server limit: {rateLimitPerMinute} requests/minute
+                </span>
+              )}
+            </p>
+          </div>
+        ) : (
+          <p className="mb-4 text-sm text-gray-600">
+            Enter your Anthropic API key to use ATNF-Chat. Your key is stored
+            locally in your browser and sent directly to Anthropic.
+          </p>
+        )}
 
         {/* Input */}
         <div className="mb-4">
@@ -76,7 +111,7 @@ export function ApiKeyModal({
             htmlFor="api-key"
             className="mb-1.5 block text-sm font-medium text-gray-700"
           >
-            Anthropic API Key
+            Anthropic API Key {isOptional && <span className="text-gray-400">(optional)</span>}
           </label>
           <div className="relative">
             <input
@@ -87,7 +122,7 @@ export function ApiKeyModal({
               onKeyDown={handleKeyDown}
               placeholder="sk-ant-..."
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              autoFocus
+              autoFocus={!isOptional}
             />
             <button
               type="button"
@@ -116,24 +151,46 @@ export function ApiKeyModal({
 
         {/* Actions */}
         <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!apiKey.trim()}
-            className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Save Key
-          </button>
+          {isOptional ? (
+            <>
+              <button
+                onClick={handleSkip}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Use Server Key
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!apiKey.trim()}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Use My Key
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!apiKey.trim()}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Save Key
+              </button>
+            </>
+          )}
         </div>
 
         {/* Privacy note */}
         <p className="mt-4 text-center text-xs text-gray-500">
-          Your API key is stored only in your browser&apos;s local storage.
+          {isOptional
+            ? "Your API key (if provided) is stored only in your browser."
+            : "Your API key is stored only in your browser's local storage."}
         </p>
       </div>
     </div>

@@ -9,9 +9,10 @@ interface HeaderProps {
   maskedKey: string;
   onApiKeyClick: () => void;
   onLogoClick?: () => void;
+  serverHasApiKey?: boolean;
 }
 
-export function Header({ hasApiKey, maskedKey, onApiKeyClick, onLogoClick }: HeaderProps) {
+export function Header({ hasApiKey, maskedKey, onApiKeyClick, onLogoClick, serverHasApiKey = false }: HeaderProps) {
   const [catalogueInfo, setCatalogueInfo] = useState<{
     version: string;
     total_pulsars: number;
@@ -62,12 +63,21 @@ export function Header({ hasApiKey, maskedKey, onApiKeyClick, onLogoClick }: Hea
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 hasApiKey
                   ? "text-green-600 hover:bg-green-50 hover:text-green-700"
+                  : serverHasApiKey
+                  ? "text-blue-600 hover:bg-blue-50 hover:text-blue-700"
                   : "text-amber-600 hover:bg-amber-50 hover:text-amber-700"
               }`}
+              title={
+                hasApiKey
+                  ? "Using your API key"
+                  : serverHasApiKey
+                  ? "Using server API key (click to use your own)"
+                  : "API key required"
+              }
             >
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">
-                {hasApiKey ? maskedKey : "Set API Key"}
+                {hasApiKey ? maskedKey : serverHasApiKey ? "Server Key" : "Set API Key"}
               </span>
             </button>
 

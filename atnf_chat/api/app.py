@@ -36,6 +36,7 @@ from atnf_chat.visualization import (
     create_sky_plot,
 )
 from atnf_chat.api.chat import router as chat_router
+from atnf_chat.api.rate_limit import RateLimitMiddleware, get_rate_limiter
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -86,6 +87,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Add rate limiting middleware (protects /chat/ when using server API key)
+app.add_middleware(
+    RateLimitMiddleware,
+    rate_limiter=get_rate_limiter(),
+    protected_paths=["/chat/"],
 )
 
 # Include routers
@@ -194,7 +202,37 @@ class HealthResponse(BaseModel):
     pulsar_count: int | None = None
 
 
+class ApiStatusResponse(BaseModel):
+    """API status response including key availability."""
+
+    has_server_key: bool = Field(
+        description="Whether the server has an API key configured"
+    )
+    rate_limit_per_minute: int = Field(
+        description="Rate limit per minute when using server key"
+    )
+    rate_limit_per_hour: int = Field(
+        description="Rate limit per hour when using server key"
+    )
+
+
 # Endpoints
+@app.get("/api/status", response_model=ApiStatusResponse)
+async def api_status() -> ApiStatusResponse:
+    """Check if server has an API key configured.
+
+    This allows the frontend to know if users need to provide their own key.
+    """
+    settings = get_settings()
+    rate_limiter = get_rate_limiter()
+
+    return ApiStatusResponse(
+        has_server_key=bool(settings.anthropic_api_key),
+        rate_limit_per_minute=rate_limiter.requests_per_minute,
+        rate_limit_per_hour=rate_limiter.requests_per_hour,
+    )
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Check API health and catalogue status."""

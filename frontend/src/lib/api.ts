@@ -7,6 +7,37 @@ import type { ChatRequest, StreamEvent } from "@/types/chat";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /**
+ * API status response
+ */
+export interface ApiStatus {
+  hasServerKey: boolean;
+  rateLimitPerMinute: number;
+  rateLimitPerHour: number;
+}
+
+/**
+ * Check API status including whether server has an API key configured
+ */
+export async function getApiStatus(): Promise<ApiStatus> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/status`);
+    if (!response.ok) {
+      // If endpoint doesn't exist (old backend), assume no server key
+      return { hasServerKey: false, rateLimitPerMinute: 0, rateLimitPerHour: 0 };
+    }
+    const data = await response.json();
+    return {
+      hasServerKey: data.has_server_key,
+      rateLimitPerMinute: data.rate_limit_per_minute,
+      rateLimitPerHour: data.rate_limit_per_hour,
+    };
+  } catch {
+    // On network error, assume no server key
+    return { hasServerKey: false, rateLimitPerMinute: 0, rateLimitPerHour: 0 };
+  }
+}
+
+/**
  * Send a chat message and receive a streaming response
  */
 export async function* streamChat(
