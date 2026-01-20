@@ -46,12 +46,14 @@ class LLMBenchmarkClient:
         self,
         api_url: str | None = None,
         use_api: bool = False,
+        model: str | None = None,
     ) -> None:
         """Initialize the benchmark client.
 
         Args:
             api_url: URL of the chat API (for API mode)
             use_api: Use the full API instead of direct tool calls
+            model: Model to use (defaults to configured anthropic_model)
         """
         self.api_url = api_url or "http://localhost:8000"
         self.use_api = use_api
@@ -59,6 +61,7 @@ class LLMBenchmarkClient:
 
         # Initialize Anthropic client for direct mode
         settings = get_settings()
+        self.model = model or settings.anthropic_model
         if settings.anthropic_api_key:
             import anthropic
 
@@ -154,7 +157,7 @@ class LLMBenchmarkClient:
 
         try:
             response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=self.model,
                 max_tokens=4096,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_query}],
@@ -261,7 +264,7 @@ class LLMBenchmarkClient:
 
         # Get final response
         response = self.anthropic_client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=self.model,
             max_tokens=4096,
             system=system_prompt,
             messages=messages,
@@ -375,17 +378,19 @@ Always use official ATNF parameter codes (P0, F0, DM, BSURF, etc.).
 def run_live_benchmark(
     test_ids: list[str] | None = None,
     output_file: str | None = None,
+    model: str | None = None,
 ) -> None:
     """Run benchmarks against the live LLM.
 
     Args:
         test_ids: Specific test IDs to run (None = all)
         output_file: Path to save results JSON
+        model: Model to use (defaults to configured anthropic_model)
     """
     from benchmarks.evaluate import BenchmarkRunner, BENCHMARK_FILE
 
     # Create client
-    client = LLMBenchmarkClient(use_api=False)
+    client = LLMBenchmarkClient(use_api=False, model=model)
 
     # Create custom runner that uses the real client
     class LiveBenchmarkRunner(BenchmarkRunner):
@@ -399,7 +404,7 @@ def run_live_benchmark(
     runner = LiveBenchmarkRunner(client)
 
     # Run benchmarks
-    print("Running live benchmarks against LLM...")
+    print(f"Running live benchmarks against LLM (model: {client.model})...")
     print("This may take several minutes and incur API costs.\n")
 
     results = runner.run_all(skip_llm=False)

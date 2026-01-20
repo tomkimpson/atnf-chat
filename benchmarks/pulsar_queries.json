@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "description": "LLM accuracy benchmark suite for ATNF-Chat",
+  "version": "2.0.0",
+  "description": "LLM accuracy benchmark suite for ATNF-Chat - comprehensive pulsar community coverage",
   "target_performance": {
     "easy": 0.95,
     "medium": 0.85,
@@ -242,6 +242,257 @@
         "must_report_completeness": true,
         "must_show_distribution": true
       }
+    },
+    {
+      "id": "easy_006",
+      "query": "What is the spin frequency of PSR J0437-4715?",
+      "difficulty": "easy",
+      "expected_tool_calls": ["get_pulsar_info"],
+      "expected_parameter": "F0",
+      "expected_answer_contains": ["173", "Hz"],
+      "validation": {
+        "must_include_value": true,
+        "must_include_unit": true
+      }
+    },
+    {
+      "id": "easy_007",
+      "query": "Show me the double pulsar",
+      "difficulty": "easy",
+      "expected_tool_calls": ["get_pulsar_info"],
+      "expected_pulsar": "J0737-3039A",
+      "alternate_names": ["J0737-3039", "double pulsar"],
+      "validation": {
+        "must_return_pulsar_data": true
+      }
+    },
+    {
+      "id": "medium_008",
+      "query": "Find all magnetars",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "TYPE",
+          "must_have_cmp": "contains",
+          "value_contains": ["AXP", "SGR", "magnetar"]
+        }
+      },
+      "validation": {
+        "result_count_range": [20, 40]
+      }
+    },
+    {
+      "id": "medium_009",
+      "query": "Show pulsars with very high magnetic fields above 10^14 Gauss",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "BSURF",
+          "must_have_cmp": "gt",
+          "value": 1e14
+        }
+      },
+      "validation": {
+        "all_results_satisfy": "BSURF > 1e14"
+      }
+    },
+    {
+      "id": "medium_010",
+      "query": "Find pulsars in Terzan 5",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "ASSOC",
+          "must_have_cmp": "contains",
+          "value_contains": ["Ter5", "Terzan 5", "Terzan5"]
+        }
+      },
+      "validation": {
+        "result_count_range": [30, 50]
+      }
+    },
+    {
+      "id": "medium_011",
+      "query": "Show pulsars in the Magellanic Clouds",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "ASSOC",
+          "must_have_cmp": "contains",
+          "value_contains": ["SMC", "LMC", "Magellanic"]
+        }
+      },
+      "validation": {
+        "result_count_range": [20, 40]
+      }
+    },
+    {
+      "id": "medium_012",
+      "query": "What is the flux density at 1400 MHz for the brightest pulsars?",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "select_fields_must_include": ["JNAME", "S1400"],
+        "order_by": "S1400",
+        "order_desc": true
+      },
+      "expected_parameters": ["S1400"],
+      "validation": {
+        "must_include_flux_values": true
+      }
+    },
+    {
+      "id": "medium_013",
+      "query": "Find the 10 fastest spinning pulsars",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "order_by_options": ["P0", "F0"],
+        "limit": 10
+      },
+      "validation": {
+        "result_count": 10,
+        "results_ordered_by": "P0 ascending or F0 descending"
+      }
+    },
+    {
+      "id": "medium_014",
+      "query": "Show the nearest pulsars to Earth",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "select_fields_must_include": ["JNAME", "DIST"],
+        "order_by": "DIST",
+        "order_desc": false
+      },
+      "validation": {
+        "results_ordered_by": "DIST ascending"
+      }
+    },
+    {
+      "id": "medium_015",
+      "query": "Find isolated pulsars that are not in binary systems",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "BINARY",
+          "must_have_cmp": "is_null"
+        }
+      },
+      "validation": {
+        "all_results_satisfy": "BINARY is null"
+      }
+    },
+    {
+      "id": "medium_016",
+      "query": "Find pulsars NOT in globular clusters",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "logic": "negation or exclusion of GC association"
+        }
+      },
+      "validation": {
+        "must_exclude_gc_pulsars": true
+      }
+    },
+    {
+      "id": "medium_017",
+      "query": "Show pulsars with parallax measurements",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "PX",
+          "must_have_cmp": "not_null"
+        }
+      },
+      "expected_parameters": ["PX"],
+      "validation": {
+        "all_results_satisfy": "PX is not null"
+      }
+    },
+    {
+      "id": "medium_018",
+      "query": "Find double neutron star systems",
+      "difficulty": "medium",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "BINCOMP",
+          "must_have_cmp": "contains",
+          "value_contains": ["NS", "neutron star"]
+        }
+      },
+      "validation": {
+        "result_count_range": [15, 30]
+      }
+    },
+    {
+      "id": "hard_006",
+      "query": "Find pulsars suitable for pulsar timing arrays - stable millisecond pulsars with low timing noise",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "op": "and",
+          "clauses_must_include": [
+            {"field": "P0", "cmp": "lt", "value_range": [0.01, 0.03]}
+          ]
+        }
+      },
+      "validation": {
+        "must_filter_msps": true,
+        "should_mention_timing_stability": true
+      }
+    },
+    {
+      "id": "hard_007",
+      "query": "Compare period distributions of globular cluster pulsars vs field pulsars",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue", "statistical_analysis"],
+      "expected_parameters": ["P0", "ASSOC"],
+      "validation": {
+        "must_separate_populations": true,
+        "must_show_comparison": true
+      }
+    },
+    {
+      "id": "hard_008",
+      "query": "What is the spatial distribution of pulsars near the galactic center?",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "filters": {
+          "must_involve_fields": ["GL", "GB"],
+          "galactic_center_region": true
+        }
+      },
+      "expected_parameters": ["GL", "GB", "RAJD", "DECJD"],
+      "validation": {
+        "must_filter_galactic_region": true
+      }
+    },
+    {
+      "id": "hard_009",
+      "query": "Find the most luminous pulsars by spin-down power",
+      "difficulty": "hard",
+      "expected_tool_calls": ["query_catalogue"],
+      "expected_dsl": {
+        "select_fields_must_include": ["JNAME", "EDOT"],
+        "order_by": "EDOT",
+        "order_desc": true
+      },
+      "validation": {
+        "results_ordered_by": "EDOT descending",
+        "must_prefer_atnf_native": true
+      }
     }
   ],
   "failure_case_tests": [
@@ -373,6 +624,88 @@
         "must_warn_about_missingness": true,
         "must_report_percentage": true
       }
+    },
+    {
+      "id": "fail_009",
+      "query": "Show pulsars with periods in milliseconds less than 5",
+      "test_type": "unit_handling",
+      "difficulty": "medium",
+      "expected_behavior": "correct_unit_conversion",
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "P0",
+          "must_have_cmp": "lt",
+          "value": 0.005
+        }
+      },
+      "validation": {
+        "must_convert_to_seconds": true,
+        "must_not_use_raw_value": true
+      }
+    },
+    {
+      "id": "fail_010",
+      "query": "Find pulsars spinning faster than 500 Hz",
+      "test_type": "unit_handling",
+      "difficulty": "medium",
+      "expected_behavior": "correct_parameter_selection",
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "F0",
+          "must_have_cmp": "gt",
+          "value": 500
+        }
+      },
+      "validation": {
+        "must_use_frequency_field": true
+      }
+    },
+    {
+      "id": "fail_011",
+      "query": "Show me pulsars with Pdot around 1e-15",
+      "test_type": "parameter_alias",
+      "difficulty": "easy",
+      "expected_behavior": "correct_parameter_mapping",
+      "expected_dsl": {
+        "filters": {
+          "must_have_field": "P1",
+          "value_approximately": 1e-15
+        }
+      },
+      "validation": {
+        "must_map_pdot_to_p1": true
+      }
+    },
+    {
+      "id": "fail_012",
+      "query": "Find the pulsar with the shortest orbital period",
+      "test_type": "superlative_query",
+      "difficulty": "medium",
+      "expected_behavior": "correct_sorting",
+      "expected_dsl": {
+        "order_by": "PB",
+        "order_desc": false,
+        "limit": 1
+      },
+      "validation": {
+        "must_sort_ascending": true,
+        "must_limit_results": true
+      }
+    },
+    {
+      "id": "fail_013",
+      "query": "What surveys discovered the most pulsars?",
+      "test_type": "unsupported_query",
+      "difficulty": "medium",
+      "expected_behavior": "explain_limitation",
+      "expected_clarification": [
+        "survey information",
+        "SURVEY field",
+        "limited coverage"
+      ],
+      "validation": {
+        "must_explain_data_limitations": true
+      }
     }
   ],
   "dsl_compliance_tests": [
@@ -422,6 +755,90 @@
       "expected_dsl_pattern": {
         "filters.op": "and",
         "filters.clauses_count": 2
+      }
+    },
+    {
+      "id": "dsl_006",
+      "description": "Is null filter for isolated pulsars",
+      "input_query": "Pulsars without binary companions",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "BINARY",
+        "filters.clauses[0].cmp": "is_null"
+      }
+    },
+    {
+      "id": "dsl_007",
+      "description": "Greater than filter with scientific notation",
+      "input_query": "Pulsars with magnetic fields greater than 10^13 Gauss",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "BSURF",
+        "filters.clauses[0].cmp": "gt",
+        "filters.clauses[0].value": 1e13
+      }
+    },
+    {
+      "id": "dsl_008",
+      "description": "Sorting with limit",
+      "input_query": "Top 5 pulsars by spin-down luminosity",
+      "expected_dsl_pattern": {
+        "order_by": "EDOT",
+        "order_desc": true,
+        "limit": 5
+      }
+    },
+    {
+      "id": "dsl_009",
+      "description": "Unit conversion - milliseconds to seconds",
+      "input_query": "Pulsars with period less than 2 milliseconds",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "P0",
+        "filters.clauses[0].cmp": "lt",
+        "filters.clauses[0].value": 0.002
+      }
+    },
+    {
+      "id": "dsl_010",
+      "description": "Parameter alias - Pdot to P1",
+      "input_query": "Pulsars with Pdot less than 1e-20",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "P1",
+        "filters.clauses[0].cmp": "lt",
+        "filters.clauses[0].value": 1e-20
+      }
+    },
+    {
+      "id": "dsl_011",
+      "description": "Multiple field selection",
+      "input_query": "Show name, period, DM and distance for all pulsars",
+      "expected_dsl_pattern": {
+        "select_fields_must_include": ["JNAME", "P0", "DM", "DIST"]
+      }
+    },
+    {
+      "id": "dsl_012",
+      "description": "Compound OR filter",
+      "input_query": "Pulsars in the SMC or LMC",
+      "expected_dsl_pattern": {
+        "filters.op": "or"
+      }
+    },
+    {
+      "id": "dsl_013",
+      "description": "Equality filter for pulsar type",
+      "input_query": "Show all binary pulsars",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "BINARY",
+        "filters.clauses[0].cmp": "not_null"
+      }
+    },
+    {
+      "id": "dsl_014",
+      "description": "Frequency instead of period",
+      "input_query": "Pulsars spinning faster than 100 rotations per second",
+      "expected_dsl_pattern": {
+        "filters.clauses[0].field": "F0",
+        "filters.clauses[0].cmp": "gt",
+        "filters.clauses[0].value": 100
       }
     }
   ]
