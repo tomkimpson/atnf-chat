@@ -1079,10 +1079,26 @@ class BenchmarkRunner:
             answer_parts = list(answer_parts) + test_case["expected_suggestions"]
         if test_case.get("expected_clarification_options"):
             answer_parts = list(answer_parts) + test_case["expected_clarification_options"]
+        if test_case.get("expected_clarification_topics"):
+            answer_parts = list(answer_parts) + test_case["expected_clarification_topics"]
         if test_case.get("expected_clarification"):
             answer_parts = list(answer_parts) + test_case["expected_clarification"]
         if test_case.get("expected_warning_topics"):
             answer_parts = list(answer_parts) + test_case["expected_warning_topics"]
+
+        # Prepend phrasing that matches failure_handling keyword checks
+        test_type = test_case.get("test_type", "")
+        if test_type in ("ambiguous_term", "vague_term"):
+            answer_parts = ["Would you like", "do you mean", "?"] + list(answer_parts)
+        elif test_type == "overly_broad":
+            # Needs len > 100 and focus indicators
+            answer_parts = [
+                "Would you like me to focus on a specific aspect?",
+                "Here is a summary of the key parameters and properties.",
+            ] + list(answer_parts)
+        elif test_type == "unsupported_query":
+            answer_parts = ["not available", "limitation"] + list(answer_parts)
+
         answer = " ".join(answer_parts) if answer_parts else "Mock response"
 
         return MockLLMResponse(
@@ -1149,6 +1165,13 @@ class BenchmarkRunner:
                         c["value"] = pat["value"]
                     elif "value_contains" in pat:
                         c["value"] = pat["value_contains"][0]
+                    else:
+                        # Provide a default value for operators that require one
+                        cmp = c["cmp"]
+                        if cmp in ("contains", "startswith"):
+                            c["value"] = "placeholder"
+                        elif cmp not in ("is_null", "not_null"):
+                            c["value"] = 0
                     clauses.append(c)
 
             if clauses:
