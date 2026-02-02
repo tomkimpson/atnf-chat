@@ -176,11 +176,13 @@ class LLMBenchmarkClient:
 
                     # Extract DSL if it's a query
                     if block.name == "query_catalogue":
-                        query_dsl = block.input.get("query_dsl")
+                        # The tool schema defines DSL fields at the top level,
+                        # so the entire input dict IS the query DSL.
+                        query_dsl = block.input
 
                         # Actually execute to get provenance
                         result = self._execute_tool(block.name, block.input)
-                        if hasattr(result, "provenance"):
+                        if hasattr(result, "provenance") and result.provenance is not None:
                             provenance = result.provenance.to_dict()
 
             # Get text response
@@ -248,13 +250,17 @@ class LLMBenchmarkClient:
                 result = self._execute_tool(block.name, block.input)
 
                 # Get provenance if available
-                if hasattr(result, "provenance") and result.provenance:
+                if result is not None and hasattr(result, "provenance") and result.provenance is not None:
                     provenance = result.provenance.to_dict()
+
+                content = "No result"
+                if result is not None:
+                    content = result.format_for_display() if hasattr(result, "format_for_display") else str(result)
 
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": result.format_for_display() if hasattr(result, "format_for_display") else str(result),
+                    "content": content,
                 })
 
         messages.append({"role": "user", "content": tool_results})
