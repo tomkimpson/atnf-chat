@@ -1070,8 +1070,19 @@ class BenchmarkRunner:
             "source": test_case.get("expected_provenance", {}).get("source", "atnf_native"),
         }
 
-        # Build mock answer
-        answer_parts = test_case.get("expected_answer_contains", [])
+        # Build mock answer from all available hint fields
+        answer_parts = (
+            test_case.get("expected_answer_contains", [])
+            or test_case.get("expected_response_contains", [])
+        )
+        if test_case.get("expected_suggestions"):
+            answer_parts = list(answer_parts) + test_case["expected_suggestions"]
+        if test_case.get("expected_clarification_options"):
+            answer_parts = list(answer_parts) + test_case["expected_clarification_options"]
+        if test_case.get("expected_clarification"):
+            answer_parts = list(answer_parts) + test_case["expected_clarification"]
+        if test_case.get("expected_warning_topics"):
+            answer_parts = list(answer_parts) + test_case["expected_warning_topics"]
         answer = " ".join(answer_parts) if answer_parts else "Mock response"
 
         return MockLLMResponse(
