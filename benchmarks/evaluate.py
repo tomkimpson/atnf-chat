@@ -1157,20 +1157,48 @@ class BenchmarkRunner:
         query_dsl: dict[str, Any] = {"filters": {"op": "and", "clauses": []}}
 
         for key, value in pattern.items():
-            if key.startswith("filters.clauses"):
-                # Extract the clause index and field
-                match = re.match(r"filters\.clauses\[(\d+)\]\.(\w+)", key)
+            if key.startswith("filters.clauses["):
+                # Handle both "clauses[0].field" and "clauses[0].value[1]"
+                match = re.match(
+                    r"filters\.clauses\[(\d+)\]\.(\w+)(?:\[(\d+)\])?", key,
+                )
                 if match:
                     idx = int(match.group(1))
                     field_name = match.group(2)
+                    arr_idx = match.group(3)
 
                     # Ensure clause exists
                     while len(query_dsl["filters"]["clauses"]) <= idx:
                         query_dsl["filters"]["clauses"].append({})
 
-                    query_dsl["filters"]["clauses"][idx][field_name] = value
+                    if arr_idx is not None:
+                        # Array element (e.g. value[0], value[1])
+                        arr_idx = int(arr_idx)
+                        existing = query_dsl["filters"]["clauses"][idx].get(field_name)
+                        if not isinstance(existing, list):
+                            existing = []
+                        while len(existing) <= arr_idx:
+                            existing.append(None)
+                        existing[arr_idx] = value
+                        query_dsl["filters"]["clauses"][idx][field_name] = existing
+                    else:
+                        query_dsl["filters"]["clauses"][idx][field_name] = value
+            elif key == "filters.clauses_count":
+                # Generate placeholder clauses to satisfy the count
+                target = value
+                clauses = query_dsl["filters"]["clauses"]
+                while len(clauses) < target:
+                    clauses.append({"field": "P0", "cmp": "lt", "value": 0.03})
             elif key == "filters.op":
                 query_dsl["filters"]["op"] = value
+
+        # Ensure operators that require a value have one
+        for clause in query_dsl["filters"]["clauses"]:
+            cmp = clause.get("cmp", "")
+            if cmp in ("contains", "startswith") and "value" not in clause:
+                clause["value"] = "placeholder"
+            elif cmp in ("eq", "ne", "lt", "le", "gt", "ge") and "value" not in clause:
+                clause["value"] = 0
 
         return MockLLMResponse(
             answer="Mock DSL response",
