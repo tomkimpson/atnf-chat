@@ -32,6 +32,13 @@ logger = logging.getLogger(__name__)
 # Path to benchmark test cases
 BENCHMARK_FILE = Path(__file__).parent / "pulsar_queries.json"
 
+# Semantic keywords used in expected_dsl patterns (medium/easy test cases)
+SEMANTIC_KEYWORDS = {
+    "must_have_field", "must_have_cmp", "value_range", "value_approximately",
+    "value_contains", "clauses_must_include", "select_fields_must_include",
+    "limit_range",
+}
+
 
 @dataclass
 class TestCaseResult:
@@ -236,6 +243,9 @@ class ResponseEvaluator:
         if query_dsl is None:
             return 0.0, {"error": "No DSL generated"}
 
+        if self._is_semantic_pattern(expected_pattern):
+            return self._evaluate_semantic_dsl_pattern(query_dsl, expected_pattern)
+
         matches = []
         mismatches = []
 
@@ -315,6 +325,268 @@ class ResponseEvaluator:
                 return None
 
         return current
+
+    def _is_semantic_pattern(self, pattern: dict[str, Any]) -> bool:
+        """Check if a pattern uses semantic keywords rather than literal paths."""
+        for key in pattern:
+            if key in SEMANTIC_KEYWORDS:
+                return True
+        # Also check inside a nested "filters" sub-dict
+        filters = pattern.get("filters")
+        if isinstance(filters, dict):
+            for key in filters:
+                if key in SEMANTIC_KEYWORDS:
+                    return True
+        return False
+
+    def _extract_all_clauses(self, dsl: dict[str, Any]) -> list[dict[str, Any]]:
+        """Recursively flatten all FilterClauses from filters.clauses."""
+        filters = dsl.get("filters")
+        if not filters:
+            return []
+        return self._flatten_clauses(filters)
+
+    def _flatten_clauses(self, group: dict[str, Any]) -> list[dict[str, Any]]:
+        """Recursively collect leaf clauses from a FilterGroup dict."""
+        result = []
+        for clause in group.get("clauses", []):
+            if "clauses" in clause:
+                # Nested FilterGroup
+                result.extend(self._flatten_clauses(clause))
+            else:
+                result.append(clause)
+        return result
+
+    def _evaluate_semantic_dsl_pattern(
+        self,
+        query_dsl: dict[str, Any],
+        expected_pattern: dict[str, Any],
+    ) -> tuple[float, dict[str, Any]]:
+        """Evaluate a DSL against a semantic expected_dsl pattern."""
+        matches: list[str] = []
+        mismatches: list[dict[str, Any]] = []
+        all_clauses = self._extract_all_clauses(query_dsl)
+
+        # --- Top-level checks ---
+
+        # select_fields_must_include
+        if "select_fields_must_include" in expected_pattern:
+            required = expected_pattern["select_fields_must_include"]
+            actual = query_dsl.get("select_fields")
+            if actual is None:
+                # None means "all fields" — that includes everything
+                matches.append("select_fields_must_include")
+            elif all(f in actual for f in required):
+                matches.append("select_fields_must_include")
+            else:
+                mismatches.append({
+                    "check": "select_fields_must_include",
+                    "expected": required,
+                    "actual": actual,
+                })
+
+        # limit_range
+        if "limit_range" in expected_pattern:
+            lo, hi = expected_pattern["limit_range"]
+            actual_limit = query_dsl.get("limit")
+            if actual_limit is not None and lo <= actual_limit <= hi:
+                matches.append("limit_range")
+            else:
+                mismatches.append({
+                    "check": "limit_range",
+                    "expected": [lo, hi],
+                    "actual": actual_limit,
+                })
+
+        # --- Filters sub-dict checks ---
+        filters_pattern = expected_pattern.get("filters")
+        if isinstance(filters_pattern, dict):
+            self._check_filters_pattern(
+                filters_pattern, query_dsl, all_clauses, matches, mismatches,
+            )
+
+        total = len(matches) + len(mismatches)
+        score = len(matches) / total if total > 0 else 1.0
+        return score, {"matches": matches, "mismatches": mismatches}
+
+    def _check_filters_pattern(
+        self,
+        filters_pattern: dict[str, Any],
+        query_dsl: dict[str, Any],
+        all_clauses: list[dict[str, Any]],
+        matches: list[str],
+        mismatches: list[dict[str, Any]],
+    ) -> None:
+        """Evaluate semantic keywords inside a filters sub-pattern."""
+
+        # op check (literal)
+        if "op" in filters_pattern:
+            actual_op = self._get_nested_value(query_dsl, "filters.op")
+            # Normalise enum values
+            if hasattr(actual_op, "value"):
+                actual_op = actual_op.value
+            if actual_op == filters_pattern["op"]:
+                matches.append("filters.op")
+            else:
+                mismatches.append({
+                    "check": "filters.op",
+                    "expected": filters_pattern["op"],
+                    "actual": actual_op,
+                })
+
+        # must_have_field + must_have_cmp  (find a clause matching both)
+        if "must_have_field" in filters_pattern:
+            req_field = filters_pattern["must_have_field"]
+            req_cmp = filters_pattern.get("must_have_cmp")
+            matched_clause = self._find_matching_clause(
+                all_clauses, req_field, req_cmp,
+            )
+            if matched_clause is not None:
+                matches.append(f"must_have_field={req_field}")
+                if req_cmp:
+                    matches.append(f"must_have_cmp={req_cmp}")
+
+                # value_range
+                if "value_range" in filters_pattern:
+                    lo, hi = filters_pattern["value_range"]
+                    val = matched_clause.get("value")
+                    if isinstance(val, (int, float)) and lo <= val <= hi:
+                        matches.append("value_range")
+                    else:
+                        mismatches.append({
+                            "check": "value_range",
+                            "expected": [lo, hi],
+                            "actual": val,
+                        })
+
+                # value_approximately (for in_range clauses)
+                if "value_approximately" in filters_pattern:
+                    lo, hi = filters_pattern["value_approximately"]
+                    val = matched_clause.get("value")
+                    if isinstance(val, list) and len(val) == 2:
+                        # Range overlaps with expected range
+                        if val[0] <= hi and val[1] >= lo:
+                            matches.append("value_approximately")
+                        else:
+                            mismatches.append({
+                                "check": "value_approximately",
+                                "expected": [lo, hi],
+                                "actual": val,
+                            })
+                    elif isinstance(val, (int, float)) and lo <= val <= hi:
+                        matches.append("value_approximately")
+                    else:
+                        mismatches.append({
+                            "check": "value_approximately",
+                            "expected": [lo, hi],
+                            "actual": val,
+                        })
+
+                # value (exact, with 10% numeric tolerance)
+                if "value" in filters_pattern:
+                    expected_val = filters_pattern["value"]
+                    actual_val = matched_clause.get("value")
+                    if self._values_close(actual_val, expected_val):
+                        matches.append("value")
+                    else:
+                        mismatches.append({
+                            "check": "value",
+                            "expected": expected_val,
+                            "actual": actual_val,
+                        })
+
+                # value_contains
+                if "value_contains" in filters_pattern:
+                    substrings = filters_pattern["value_contains"]
+                    actual_val = str(matched_clause.get("value", ""))
+                    if any(s.lower() in actual_val.lower() for s in substrings):
+                        matches.append("value_contains")
+                    else:
+                        mismatches.append({
+                            "check": "value_contains",
+                            "expected_any_of": substrings,
+                            "actual": actual_val,
+                        })
+            else:
+                mismatches.append({
+                    "check": "must_have_field",
+                    "expected_field": req_field,
+                    "expected_cmp": req_cmp,
+                    "actual_clauses": all_clauses,
+                })
+
+        # clauses_must_include (order-independent list of clause patterns)
+        if "clauses_must_include" in filters_pattern:
+            for i, clause_pat in enumerate(filters_pattern["clauses_must_include"]):
+                req_field = clause_pat.get("field")
+                req_cmp = clause_pat.get("cmp")
+                matched = self._find_matching_clause(
+                    all_clauses, req_field, req_cmp,
+                )
+                label = f"clauses_must_include[{i}](field={req_field})"
+                if matched is not None:
+                    matches.append(label)
+
+                    # Nested value check
+                    if "value" in clause_pat:
+                        if self._values_close(matched.get("value"), clause_pat["value"]):
+                            matches.append(f"{label}.value")
+                        else:
+                            mismatches.append({
+                                "check": f"{label}.value",
+                                "expected": clause_pat["value"],
+                                "actual": matched.get("value"),
+                            })
+
+                    # Nested value_contains check
+                    if "value_contains" in clause_pat:
+                        substrings = clause_pat["value_contains"]
+                        actual_val = str(matched.get("value", ""))
+                        if any(s.lower() in actual_val.lower() for s in substrings):
+                            matches.append(f"{label}.value_contains")
+                        else:
+                            mismatches.append({
+                                "check": f"{label}.value_contains",
+                                "expected_any_of": substrings,
+                                "actual": actual_val,
+                            })
+                else:
+                    mismatches.append({
+                        "check": label,
+                        "expected_field": req_field,
+                        "expected_cmp": req_cmp,
+                    })
+
+    def _find_matching_clause(
+        self,
+        clauses: list[dict[str, Any]],
+        field: str | None,
+        cmp: str | None,
+    ) -> dict[str, Any] | None:
+        """Find a clause matching both field and cmp (if given)."""
+        for clause in clauses:
+            clause_field = clause.get("field", "")
+            clause_cmp = clause.get("cmp", "")
+            # Normalise enum values
+            if hasattr(clause_cmp, "value"):
+                clause_cmp = clause_cmp.value
+            if field and clause_field.upper() != field.upper():
+                continue
+            if cmp and clause_cmp != cmp:
+                continue
+            return clause
+        return None
+
+    @staticmethod
+    def _values_close(actual: Any, expected: Any) -> bool:
+        """Compare values with 10% numeric tolerance."""
+        if actual == expected:
+            return True
+        if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
+            if expected == 0:
+                return abs(actual) < 1e-9
+            return abs(actual - expected) / max(abs(expected), 1) < 0.1
+        return False
 
     def evaluate_provenance(
         self,
@@ -787,12 +1059,7 @@ class BenchmarkRunner:
         # Build mock DSL from expected_dsl hints
         query_dsl = None
         if "expected_dsl" in test_case:
-            expected = test_case["expected_dsl"]
-            query_dsl = {
-                "select_fields": expected.get("select_fields_must_include", ["JNAME", "P0"]),
-                "filters": None,
-                "limit": expected.get("limit_range", [10, 10])[0] if "limit_range" in expected else None,
-            }
+            query_dsl = self._build_mock_dsl_from_semantic(test_case["expected_dsl"])
 
         # Build mock provenance
         provenance = {
@@ -803,8 +1070,35 @@ class BenchmarkRunner:
             "source": test_case.get("expected_provenance", {}).get("source", "atnf_native"),
         }
 
-        # Build mock answer
-        answer_parts = test_case.get("expected_answer_contains", [])
+        # Build mock answer from all available hint fields
+        answer_parts = (
+            test_case.get("expected_answer_contains", [])
+            or test_case.get("expected_response_contains", [])
+        )
+        if test_case.get("expected_suggestions"):
+            answer_parts = list(answer_parts) + test_case["expected_suggestions"]
+        if test_case.get("expected_clarification_options"):
+            answer_parts = list(answer_parts) + test_case["expected_clarification_options"]
+        if test_case.get("expected_clarification_topics"):
+            answer_parts = list(answer_parts) + test_case["expected_clarification_topics"]
+        if test_case.get("expected_clarification"):
+            answer_parts = list(answer_parts) + test_case["expected_clarification"]
+        if test_case.get("expected_warning_topics"):
+            answer_parts = list(answer_parts) + test_case["expected_warning_topics"]
+
+        # Prepend phrasing that matches failure_handling keyword checks
+        test_type = test_case.get("test_type", "")
+        if test_type in ("ambiguous_term", "vague_term"):
+            answer_parts = ["Would you like", "do you mean", "?"] + list(answer_parts)
+        elif test_type == "overly_broad":
+            # Needs len > 100 and focus indicators
+            answer_parts = [
+                "Would you like me to focus on a specific aspect?",
+                "Here is a summary of the key parameters and properties.",
+            ] + list(answer_parts)
+        elif test_type == "unsupported_query":
+            answer_parts = ["not available", "limitation"] + list(answer_parts)
+
         answer = " ".join(answer_parts) if answer_parts else "Mock response"
 
         return MockLLMResponse(
@@ -814,6 +1108,81 @@ class BenchmarkRunner:
             provenance=provenance,
         )
 
+    def _build_mock_dsl_from_semantic(self, expected: dict[str, Any]) -> dict[str, Any]:
+        """Build a valid DSL dict from semantic expected_dsl patterns."""
+        dsl: dict[str, Any] = {}
+
+        # select_fields
+        if "select_fields_must_include" in expected:
+            dsl["select_fields"] = expected["select_fields_must_include"]
+        else:
+            dsl["select_fields"] = None
+
+        # limit
+        if "limit_range" in expected:
+            dsl["limit"] = expected["limit_range"][0]
+        else:
+            dsl["limit"] = None
+
+        # Top-level literal keys (e.g. order_by, order_desc for hard cases)
+        for key in ("order_by", "order_desc"):
+            if key in expected:
+                dsl[key] = expected[key]
+
+        # Build filters from semantic patterns
+        clauses: list[dict[str, Any]] = []
+        filters_pat = expected.get("filters")
+        if isinstance(filters_pat, dict):
+            op = filters_pat.get("op", "and")
+
+            # must_have_field / must_have_cmp
+            if "must_have_field" in filters_pat:
+                clause: dict[str, Any] = {
+                    "field": filters_pat["must_have_field"],
+                    "cmp": filters_pat.get("must_have_cmp", "lt"),
+                }
+                # Pick a value that satisfies the pattern checks
+                if "value_range" in filters_pat:
+                    lo, hi = filters_pat["value_range"]
+                    clause["value"] = (lo + hi) / 2
+                elif "value_approximately" in filters_pat:
+                    lo, hi = filters_pat["value_approximately"]
+                    clause["value"] = [lo, hi]
+                elif "value" in filters_pat:
+                    clause["value"] = filters_pat["value"]
+                elif "value_contains" in filters_pat:
+                    clause["value"] = filters_pat["value_contains"][0]
+                clauses.append(clause)
+
+            # clauses_must_include
+            if "clauses_must_include" in filters_pat:
+                for pat in filters_pat["clauses_must_include"]:
+                    c: dict[str, Any] = {
+                        "field": pat["field"],
+                        "cmp": pat.get("cmp", "eq"),
+                    }
+                    if "value" in pat:
+                        c["value"] = pat["value"]
+                    elif "value_contains" in pat:
+                        c["value"] = pat["value_contains"][0]
+                    else:
+                        # Provide a default value for operators that require one
+                        cmp = c["cmp"]
+                        if cmp in ("contains", "startswith"):
+                            c["value"] = "placeholder"
+                        elif cmp not in ("is_null", "not_null"):
+                            c["value"] = 0
+                    clauses.append(c)
+
+            if clauses:
+                dsl["filters"] = {"op": op, "clauses": clauses}
+            else:
+                dsl["filters"] = None
+        else:
+            dsl["filters"] = None
+
+        return dsl
+
     def _create_mock_dsl_response(self, test_case: dict[str, Any]) -> MockLLMResponse:
         """Create mock DSL response for DSL compliance tests."""
         pattern = test_case.get("expected_dsl_pattern", {})
@@ -822,20 +1191,48 @@ class BenchmarkRunner:
         query_dsl: dict[str, Any] = {"filters": {"op": "and", "clauses": []}}
 
         for key, value in pattern.items():
-            if key.startswith("filters.clauses"):
-                # Extract the clause index and field
-                match = re.match(r"filters\.clauses\[(\d+)\]\.(\w+)", key)
+            if key.startswith("filters.clauses["):
+                # Handle both "clauses[0].field" and "clauses[0].value[1]"
+                match = re.match(
+                    r"filters\.clauses\[(\d+)\]\.(\w+)(?:\[(\d+)\])?", key,
+                )
                 if match:
                     idx = int(match.group(1))
                     field_name = match.group(2)
+                    arr_idx = match.group(3)
 
                     # Ensure clause exists
                     while len(query_dsl["filters"]["clauses"]) <= idx:
                         query_dsl["filters"]["clauses"].append({})
 
-                    query_dsl["filters"]["clauses"][idx][field_name] = value
+                    if arr_idx is not None:
+                        # Array element (e.g. value[0], value[1])
+                        arr_idx = int(arr_idx)
+                        existing = query_dsl["filters"]["clauses"][idx].get(field_name)
+                        if not isinstance(existing, list):
+                            existing = []
+                        while len(existing) <= arr_idx:
+                            existing.append(None)
+                        existing[arr_idx] = value
+                        query_dsl["filters"]["clauses"][idx][field_name] = existing
+                    else:
+                        query_dsl["filters"]["clauses"][idx][field_name] = value
+            elif key == "filters.clauses_count":
+                # Generate placeholder clauses to satisfy the count
+                target = value
+                clauses = query_dsl["filters"]["clauses"]
+                while len(clauses) < target:
+                    clauses.append({"field": "P0", "cmp": "lt", "value": 0.03})
             elif key == "filters.op":
                 query_dsl["filters"]["op"] = value
+
+        # Ensure operators that require a value have one
+        for clause in query_dsl["filters"]["clauses"]:
+            cmp = clause.get("cmp", "")
+            if cmp in ("contains", "startswith") and "value" not in clause:
+                clause["value"] = "placeholder"
+            elif cmp in ("eq", "ne", "lt", "le", "gt", "ge") and "value" not in clause:
+                clause["value"] = 0
 
         return MockLLMResponse(
             answer="Mock DSL response",

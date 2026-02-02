@@ -397,3 +397,189 @@ class TestMockLLMResponse:
         assert data["answer"] == ""
         assert data["tool_calls"] == []
         assert data["query_dsl"] is None
+
+
+class TestSemanticDSLPattern:
+    """Test the semantic DSL pattern matching evaluator."""
+
+    @pytest.fixture
+    def evaluator(self) -> ResponseEvaluator:
+        return ResponseEvaluator()
+
+    def test_must_have_field_and_cmp_match(self, evaluator: ResponseEvaluator) -> None:
+        """Clause with matching field+cmp should score 1.0."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "P0", "cmp": "lt", "value": 0.02},
+        ]}}
+        pattern = {"filters": {"must_have_field": "P0", "must_have_cmp": "lt"}}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+        assert any("must_have_field" in m for m in details["matches"])
+
+    def test_must_have_field_no_match(self, evaluator: ResponseEvaluator) -> None:
+        """Missing field should produce mismatches."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "DM", "cmp": "gt", "value": 10},
+        ]}}
+        pattern = {"filters": {"must_have_field": "P0", "must_have_cmp": "lt"}}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 0.0
+        assert len(details["mismatches"]) > 0
+
+    def test_value_range_in_range(self, evaluator: ResponseEvaluator) -> None:
+        """Value within range should pass."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "P0", "cmp": "lt", "value": 0.02},
+        ]}}
+        pattern = {"filters": {
+            "must_have_field": "P0", "must_have_cmp": "lt",
+            "value_range": [0.01, 0.03],
+        }}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+        assert "value_range" in details["matches"]
+
+    def test_value_range_out_of_range(self, evaluator: ResponseEvaluator) -> None:
+        """Value outside range should fail that check."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "P0", "cmp": "lt", "value": 0.5},
+        ]}}
+        pattern = {"filters": {
+            "must_have_field": "P0", "must_have_cmp": "lt",
+            "value_range": [0.01, 0.03],
+        }}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score < 1.0
+        assert any(m.get("check") == "value_range" for m in details["mismatches"])
+
+    def test_value_approximately_with_range_clause(
+        self, evaluator: ResponseEvaluator
+    ) -> None:
+        """in_range clause overlapping expected range should pass."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "P0", "cmp": "in_range", "value": [0.0013, 0.0015]},
+        ]}}
+        pattern = {"filters": {
+            "must_have_field": "P0", "must_have_cmp": "in_range",
+            "value_approximately": [0.0013, 0.0015],
+        }}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+        assert "value_approximately" in details["matches"]
+
+    def test_value_contains(self, evaluator: ResponseEvaluator) -> None:
+        """String value containing expected substring should pass."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "ASSOC", "cmp": "contains", "value": "SNR"},
+        ]}}
+        pattern = {"filters": {
+            "must_have_field": "ASSOC", "must_have_cmp": "contains",
+            "value_contains": ["SNR"],
+        }}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+        assert "value_contains" in details["matches"]
+
+    def test_clauses_must_include_order_independent(
+        self, evaluator: ResponseEvaluator
+    ) -> None:
+        """clauses_must_include should match regardless of order."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "ASSOC", "cmp": "contains", "value": "47 Tuc"},
+            {"field": "P0", "cmp": "lt", "value": 0.03},
+        ]}}
+        pattern = {"filters": {
+            "op": "and",
+            "clauses_must_include": [
+                {"field": "P0", "cmp": "lt"},
+                {"field": "ASSOC", "cmp": "contains", "value_contains": ["47", "Tuc"]},
+            ],
+        }}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+
+    def test_clauses_must_include_partial(self, evaluator: ResponseEvaluator) -> None:
+        """Missing one clause should give partial credit."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "P0", "cmp": "lt", "value": 0.03},
+        ]}}
+        pattern = {"filters": {
+            "op": "and",
+            "clauses_must_include": [
+                {"field": "P0", "cmp": "lt"},
+                {"field": "ASSOC", "cmp": "contains"},
+            ],
+        }}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert 0 < score < 1.0
+
+    def test_select_fields_must_include(self, evaluator: ResponseEvaluator) -> None:
+        """select_fields containing required fields should pass."""
+        dsl = {"select_fields": ["JNAME", "P0", "DM"], "filters": None}
+        pattern = {"select_fields_must_include": ["JNAME", "P0"]}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+
+    def test_select_fields_none_passes(self, evaluator: ResponseEvaluator) -> None:
+        """None select_fields (all fields) should pass any must_include check."""
+        dsl = {"select_fields": None, "filters": None}
+        pattern = {"select_fields_must_include": ["JNAME", "P0"]}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+
+    def test_limit_range_in_range(self, evaluator: ResponseEvaluator) -> None:
+        """Limit within range should pass."""
+        dsl = {"select_fields": ["JNAME", "P0"], "limit": 5, "filters": None}
+        pattern = {"select_fields_must_include": ["JNAME", "P0"], "limit_range": [5, 10]}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0
+        assert "limit_range" in details["matches"]
+
+    def test_limit_range_out_of_range(self, evaluator: ResponseEvaluator) -> None:
+        """Limit outside range should fail that check."""
+        dsl = {"select_fields": ["JNAME", "P0"], "limit": 100, "filters": None}
+        pattern = {"select_fields_must_include": ["JNAME", "P0"], "limit_range": [5, 10]}
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score < 1.0
+        assert any(m.get("check") == "limit_range" for m in details["mismatches"])
+
+    def test_literal_path_patterns_still_work(
+        self, evaluator: ResponseEvaluator
+    ) -> None:
+        """Existing literal-path patterns should still match correctly."""
+        dsl = {"filters": {"op": "and", "clauses": [
+            {"field": "P0", "cmp": "lt", "value": 0.01},
+        ]}}
+        pattern = {
+            "filters.clauses[0].field": "P0",
+            "filters.clauses[0].cmp": "lt",
+            "filters.clauses[0].value": 0.01,
+        }
+
+        score, details = evaluator.evaluate_dsl_pattern(dsl, pattern)
+
+        assert score == 1.0

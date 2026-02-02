@@ -23,6 +23,23 @@ This means you get the convenience of natural language with the accuracy of dire
 - **Scientific Safety**: Explicit null handling and data quality warnings
 - **Reproducible**: All queries exportable as validated Python code
 
+## Why not just ask a frontier LLM?
+
+Modern LLMs like ChatGPT and Claude have agent modes and code execution — so why use ATNF-Chat? Consider a concrete example:
+
+> **"How many millisecond pulsars have orbital periods less than 1 day?"**
+
+**ATNF-Chat** translates this to a validated query (`P0 < 0.03 && PB < 1.0`) against the live catalogue and returns the exact answer: **174 pulsars** (ATNF v2.7.0, 4351 pulsars).
+
+**A frontier LLM** without catalogue access will typically:
+
+- **Hallucinate a number**, stated with false confidence
+- **Cite stale literature**, e.g. ~70 confirmed "spider" pulsars from a 2019 survey or ~111 entries from the 2025 SpiderCat catalogue — both of which describe curated astrophysical classes, not the raw catalogue query result
+- **Conflate categories**: "spider pulsars" (black widows and redbacks with confirmed companion ablation) are a *subset* of MSPs with PB < 1 day, but an LLM will often treat them as equivalent
+- **Punt**, telling you to go query the catalogue yourself
+
+Even with web search, the precise answer (174) does not appear in any published paper — it is a live database query whose result changes as new pulsars are discovered. This is the class of question where RAG over a structured catalogue provides value that a general-purpose LLM cannot replicate.
+
 ## Quick Start
 
 ### Local Development
