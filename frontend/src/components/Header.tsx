@@ -62,12 +62,12 @@ export function Header({ hasApiKey, maskedKey, onApiKeyClick, onLogoClick }: Hea
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 hasApiKey
                   ? "text-green-600 hover:bg-green-50 hover:text-green-700"
-                  : "text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                  : "text-blue-600 hover:bg-blue-50 hover:text-blue-700"
               }`}
             >
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">
-                {hasApiKey ? maskedKey : "Set API Key"}
+                {hasApiKey ? maskedKey : "Free Tier"}
               </span>
             </button>
 

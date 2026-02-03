@@ -9,8 +9,8 @@ export default function Home() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [chatKey, setChatKey] = useState(0);
 
-  // Show modal automatically if no API key is set (after loading)
-  const shouldPromptForKey = isLoaded && !hasApiKey;
+  // Don't auto-prompt — free tier works without a key
+  const shouldPromptForKey = false;
 
   // Reset chat by changing key to force remount
   const handleLogoClick = useCallback(() => {

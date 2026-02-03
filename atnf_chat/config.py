@@ -30,6 +30,16 @@ class Settings(BaseSettings):
         description="Claude model to use",
     )
 
+    # OpenRouter Configuration (free tier fallback)
+    openrouter_api_key: str = Field(
+        default="",
+        description="OpenRouter API key for free tier fallback",
+    )
+    openrouter_model: str = Field(
+        default="google/gemini-2.5-flash:free",
+        description="Default free model on OpenRouter",
+    )
+
     # Application Settings
     environment: Literal["development", "staging", "production"] = Field(
         default="development",

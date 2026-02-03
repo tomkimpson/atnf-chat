@@ -66,8 +66,8 @@ export function ApiKeyModal({
 
         {/* Description */}
         <p className="mb-4 text-sm text-gray-600">
-          Enter your Anthropic API key to use ATNF-Chat. Your key is stored
-          locally in your browser and sent directly to Anthropic.
+          Provide your own Anthropic API key for the best experience, or skip
+          to use our free tier (rate limited).
         </p>
 
         {/* Input */}
@@ -76,7 +76,7 @@ export function ApiKeyModal({
             htmlFor="api-key"
             className="mb-1.5 block text-sm font-medium text-gray-700"
           >
-            Anthropic API Key
+            Anthropic API Key (optional)
           </label>
           <div className="relative">
             <input
@@ -120,7 +120,7 @@ export function ApiKeyModal({
             onClick={onClose}
             className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            Skip &mdash; Use Free Tier
           </button>
           <button
             onClick={handleSave}
@@ -133,7 +133,8 @@ export function ApiKeyModal({
 
         {/* Privacy note */}
         <p className="mt-4 text-center text-xs text-gray-500">
-          Your API key is stored only in your browser&apos;s local storage.
+          Your API key is stored only in your browser&apos;s local storage and
+          sent directly to Anthropic. The free tier routes through OpenRouter.
         </p>
       </div>
     </div>
