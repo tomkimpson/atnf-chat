@@ -156,6 +156,19 @@ class AnalysisResult:
             "error": self.error,
         }
 
+    def format_for_display(self) -> str:
+        """Format as human-readable string."""
+        if not self.success:
+            return f"**Analysis Failed:** {self.error}"
+
+        parts: list[str] = []
+        for s in self.summaries:
+            parts.append(s.format_for_display())
+        for c in self.correlations:
+            parts.append(c.format_for_display())
+
+        return "\n\n".join(parts) if parts else "No analysis results."
+
 
 def statistical_analysis(
     df: pd.DataFrame,

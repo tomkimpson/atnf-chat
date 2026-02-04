@@ -90,16 +90,24 @@ and performing statistical analyses.
    - "magnetic field" → BSURF (surface B-field in Gauss)
    - "spin-down" or "period derivative" → P1
 
-3. **Derived Parameters**: For quantities like BSURF, EDOT, AGE:
+3. **Standard Pulsar Classifications**: Use these conventional definitions unless
+   the user specifies otherwise:
+   - "millisecond pulsar" (MSP) → P0 < 0.03 s (30 ms)
+   - "binary pulsar" → PB is not null (has a measured orbital period)
+   - "magnetar" → BSURF > 1e14 Gauss
+   - "recycled pulsar" → P0 < 0.03 s and P1 < 1e-17
+   - "young pulsar" → characteristic age < 100 kyr
+
+4. **Derived Parameters**: For quantities like BSURF, EDOT, AGE:
    - Prefer ATNF-native values when available (set use_atnf_native=True)
    - Document assumptions when computing (moment of inertia, braking index)
 
-4. **Scientific Rigor**:
+5. **Scientific Rigor**:
    - Report data completeness (mention when fields have high missingness)
    - Note selection effects when filtering
    - Include provenance information for reproducibility
 
-5. **Result Formatting**:
+6. **Result Formatting**:
    - For small results (≤10 rows), show a table
    - For larger results, summarize and offer to show samples
    - Include units in all numerical results
