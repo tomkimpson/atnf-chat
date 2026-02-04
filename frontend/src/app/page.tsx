@@ -5,12 +5,15 @@ import { ApiKeyModal, Chat, Header } from "../components";
 import { useApiKey } from "../lib/useApiKey";
 
 export default function Home() {
-  const { apiKey, setApiKey, hasApiKey, maskedKey, isLoaded } = useApiKey();
+  const { apiKey, setApiKey, maskedKey, isLoaded, tier, setTier } = useApiKey();
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [chatKey, setChatKey] = useState(0);
 
-  // Don't auto-prompt — free tier works without a key
-  const shouldPromptForKey = false;
+  // Show modal on first visit (no tier preference stored yet)
+  const shouldPromptForKey =
+    isLoaded &&
+    typeof window !== "undefined" &&
+    !localStorage.getItem("atnf-chat-tier");
 
   // Reset chat by changing key to force remount
   const handleLogoClick = useCallback(() => {
@@ -20,7 +23,7 @@ export default function Home() {
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       <Header
-        hasApiKey={hasApiKey}
+        tier={tier}
         maskedKey={maskedKey}
         onApiKeyClick={() => setShowApiKeyModal(true)}
         onLogoClick={handleLogoClick}
@@ -37,7 +40,9 @@ export default function Home() {
         isOpen={showApiKeyModal || shouldPromptForKey}
         onClose={() => setShowApiKeyModal(false)}
         onSave={setApiKey}
+        onTierSelect={setTier}
         currentKey={apiKey}
+        currentTier={tier}
       />
     </div>
   );

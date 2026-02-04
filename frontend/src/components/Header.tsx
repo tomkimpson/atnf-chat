@@ -3,15 +3,16 @@
 import { useState, useEffect } from "react";
 import { Telescope, Github, ExternalLink, Key } from "lucide-react";
 import { getCatalogueInfo } from "../lib/api";
+import type { ApiTier } from "../lib/useApiKey";
 
 interface HeaderProps {
-  hasApiKey: boolean;
+  tier: ApiTier;
   maskedKey: string;
   onApiKeyClick: () => void;
   onLogoClick?: () => void;
 }
 
-export function Header({ hasApiKey, maskedKey, onApiKeyClick, onLogoClick }: HeaderProps) {
+export function Header({ tier, maskedKey, onApiKeyClick, onLogoClick }: HeaderProps) {
   const [catalogueInfo, setCatalogueInfo] = useState<{
     version: string;
     total_pulsars: number;
@@ -24,6 +25,12 @@ export function Header({ hasApiKey, maskedKey, onApiKeyClick, onLogoClick }: Hea
         // Silently fail - will show placeholder
       });
   }, []);
+
+  const tierDisplay = {
+    "free-shared": { label: "Free Tier", color: "text-gray-500 hover:bg-gray-100 hover:text-gray-700" },
+    openrouter: { label: maskedKey || "OpenRouter", color: "text-blue-600 hover:bg-blue-50 hover:text-blue-700" },
+    anthropic: { label: maskedKey || "Anthropic", color: "text-green-600 hover:bg-green-50 hover:text-green-700" },
+  }[tier];
 
   return (
     <header className="border-b border-gray-200 bg-white">
@@ -56,19 +63,13 @@ export function Header({ hasApiKey, maskedKey, onApiKeyClick, onLogoClick }: Hea
           )}
 
           <div className="flex items-center gap-2">
-            {/* API Key button */}
+            {/* API Key / Tier button */}
             <button
               onClick={onApiKeyClick}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                hasApiKey
-                  ? "text-green-600 hover:bg-green-50 hover:text-green-700"
-                  : "text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-              }`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${tierDisplay.color}`}
             >
               <Key className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                {hasApiKey ? maskedKey : "Free Tier"}
-              </span>
+              <span className="hidden sm:inline">{tierDisplay.label}</span>
             </button>
 
             <a

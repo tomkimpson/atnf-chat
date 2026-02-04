@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         description="OpenRouter API key for free tier fallback",
     )
     openrouter_model: str = Field(
-        default="google/gemini-2.5-flash:free",
+        default="google/gemini-2.5-flash",
         description="Default free model on OpenRouter",
     )
 

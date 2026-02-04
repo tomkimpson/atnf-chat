@@ -198,6 +198,8 @@ class OpenRouterProvider(LLMProvider):
         api_key: str,
         model: str,
         tool_executor: Callable[[str, dict[str, Any]], str],
+        *,
+        is_shared_key: bool = False,
     ) -> None:
         self.client = openai.AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -209,6 +211,7 @@ class OpenRouterProvider(LLMProvider):
         )
         self.model = model
         self.tool_executor = tool_executor
+        self.is_shared_key = is_shared_key
 
     def _convert_tools(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert Anthropic-format tools to OpenAI-format tools."""
@@ -244,6 +247,20 @@ class OpenRouterProvider(LLMProvider):
             acc[idx]["name"] = tc.function.name
         if tc.function and tc.function.arguments:
             acc[idx]["arguments"] += tc.function.arguments
+
+    def _rate_limit_hint(self) -> str:
+        """Return a user-facing hint for rate-limit errors."""
+        if self.is_shared_key:
+            return (
+                " — This is a shared key with limited capacity."
+                " Get your own free OpenRouter key at openrouter.ai/settings/keys"
+                " or provide an Anthropic API key for the best experience."
+            )
+        return (
+            " — You've hit your OpenRouter rate limit."
+            " Wait a moment and try again, or provide an Anthropic API key"
+            " for higher limits."
+        )
 
     @staticmethod
     def _parse_tool_args(arguments: str) -> dict[str, Any]:
@@ -344,7 +361,7 @@ class OpenRouterProvider(LLMProvider):
             logger.exception("OpenRouter API error during streaming")
             error_msg = str(e)
             if "rate limit" in error_msg.lower():
-                error_msg += " — Consider providing your own Anthropic API key for higher limits."
+                error_msg += self._rate_limit_hint()
             yield f"data: {json.dumps({'type': 'error', 'error': f'API error: {error_msg}'})}\n\n"
         except Exception as e:
             logger.exception("Unexpected error during streaming")
@@ -415,16 +432,29 @@ def get_provider(
 ) -> LLMProvider:
     """Create the appropriate LLM provider based on available credentials.
 
-    Priority: user API key → server Anthropic key → OpenRouter free tier.
+    Priority: user API key (detected by prefix) → server Anthropic key
+    → server OpenRouter key (shared free tier).
     """
     if api_key:
-        return AnthropicProvider(api_key, settings.anthropic_model, tool_executor)
+        if api_key.startswith("sk-ant-"):
+            return AnthropicProvider(api_key, settings.anthropic_model, tool_executor)
+        if api_key.startswith("sk-or-"):
+            return OpenRouterProvider(
+                api_key, settings.openrouter_model, tool_executor
+            )
+        raise ValueError(
+            "Unrecognized API key format. "
+            "Anthropic keys start with 'sk-ant-', OpenRouter keys start with 'sk-or-'."
+        )
     if settings.anthropic_api_key:
         return AnthropicProvider(
             settings.anthropic_api_key, settings.anthropic_model, tool_executor
         )
     if settings.openrouter_api_key:
         return OpenRouterProvider(
-            settings.openrouter_api_key, settings.openrouter_model, tool_executor
+            settings.openrouter_api_key,
+            settings.openrouter_model,
+            tool_executor,
+            is_shared_key=True,
         )
     raise ValueError("No LLM provider configured")
