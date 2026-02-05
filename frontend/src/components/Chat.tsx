@@ -30,12 +30,6 @@ export function Chat({ apiKey, onApiKeyNeeded }: ChatProps) {
   }, [messages, scrollToBottom]);
 
   const handleSend = async (content: string) => {
-    // Check if API key is set
-    if (!apiKey) {
-      onApiKeyNeeded();
-      return;
-    }
-
     // Add user message
     const userMessage: Message = {
       id: generateId(),

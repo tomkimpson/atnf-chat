@@ -30,6 +30,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     # LLM
     "anthropic>=0.40",
+    "openai>=1.0.0",
     # Visualization
     "plotly>=5.18",
     "matplotlib>=3.8",

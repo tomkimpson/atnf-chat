@@ -1,16 +1,15 @@
 """Chat endpoint with LLM integration and streaming.
 
 This module provides the conversational interface to the ATNF catalogue,
-using Claude for natural language understanding and function calling.
+using an LLM provider (Anthropic or OpenRouter) for natural language
+understanding and function calling.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import Any
 
-import anthropic
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -18,6 +17,7 @@ from pydantic import BaseModel, Field
 from atnf_chat.config import get_settings
 from atnf_chat.core.catalogue import get_catalogue
 from atnf_chat.core.schema import SchemaGroundingPack
+from atnf_chat.llm import get_provider
 from atnf_chat.tools import (
     compute_derived_parameter,
     correlation_analysis,
@@ -27,9 +27,6 @@ from atnf_chat.tools import (
     query_catalogue,
     statistical_analysis,
 )
-
-if TYPE_CHECKING:
-    from anthropic.types import Message, MessageStreamEvent
 
 logger = logging.getLogger(__name__)
 
@@ -93,16 +90,24 @@ and performing statistical analyses.
    - "magnetic field" → BSURF (surface B-field in Gauss)
    - "spin-down" or "period derivative" → P1
 
-3. **Derived Parameters**: For quantities like BSURF, EDOT, AGE:
+3. **Standard Pulsar Classifications**: Use these conventional definitions unless
+   the user specifies otherwise:
+   - "millisecond pulsar" (MSP) → P0 < 0.03 s (30 ms)
+   - "binary pulsar" → PB is not null (has a measured orbital period)
+   - "magnetar" → BSURF > 1e14 Gauss
+   - "recycled pulsar" → P0 < 0.03 s and P1 < 1e-17
+   - "young pulsar" → characteristic age < 100 kyr
+
+4. **Derived Parameters**: For quantities like BSURF, EDOT, AGE:
    - Prefer ATNF-native values when available (set use_atnf_native=True)
    - Document assumptions when computing (moment of inertia, braking index)
 
-4. **Scientific Rigor**:
+5. **Scientific Rigor**:
    - Report data completeness (mention when fields have high missingness)
    - Note selection effects when filtering
    - Include provenance information for reproducibility
 
-5. **Result Formatting**:
+6. **Result Formatting**:
    - For small results (≤10 rows), show a table
    - For larger results, summarize and offer to show samples
    - Include units in all numerical results
@@ -199,83 +204,6 @@ def _execute_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
         return f"Tool execution failed: {e}"
 
 
-async def _stream_chat_response(
-    client: anthropic.AsyncAnthropic,
-    messages: list[dict[str, str]],
-    tools: list[dict[str, Any]],
-) -> AsyncGenerator[str, None]:
-    """Stream chat response with tool handling.
-
-    Supports multiple rounds of tool calls - the LLM can make sequential
-    tool calls (e.g., query + calculate percentage) and all will be processed.
-    """
-    system_prompt = _build_system_prompt()
-    current_messages = list(messages)  # Copy to avoid mutation
-    max_tool_rounds = 10  # Safety limit to prevent infinite loops
-
-    try:
-        for round_num in range(max_tool_rounds):
-            async with client.messages.stream(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4096,
-                system=system_prompt,
-                messages=current_messages,
-                tools=tools,
-            ) as stream:
-                # Stream text as it arrives
-                async for event in stream:
-                    if hasattr(event, "type") and event.type == "content_block_delta":
-                        if hasattr(event.delta, "text"):
-                            yield f"data: {json.dumps({'type': 'text', 'content': event.delta.text})}\n\n"
-
-                # Get the final message to check for tool use
-                final_message = await stream.get_final_message()
-
-            # Check if there are tool calls to process
-            tool_calls = [
-                block for block in final_message.content
-                if hasattr(block, "type") and block.type == "tool_use"
-            ]
-
-            # If no tool calls, we're done
-            if not tool_calls:
-                break
-
-            # Process tool calls
-            tool_results = []
-            for tool_call in tool_calls:
-                yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_call.name})}\n\n"
-
-                result = _execute_tool(tool_call.name, tool_call.input)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_call.id,
-                    "content": result,
-                })
-
-            # Update messages for next round
-            current_messages = current_messages + [
-                {"role": "assistant", "content": final_message.content},
-                {"role": "user", "content": tool_results},
-            ]
-
-            logger.debug(f"Tool round {round_num + 1} complete, continuing...")
-
-        else:
-            # Hit max rounds - log warning
-            logger.warning(f"Hit max tool rounds ({max_tool_rounds}), stopping")
-            yield f"data: {json.dumps({'type': 'warning', 'message': 'Maximum tool call rounds reached'})}\n\n"
-
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
-
-    except anthropic.APIError as e:
-        logger.exception("Anthropic API error during streaming")
-        yield f"data: {json.dumps({'type': 'error', 'error': f'API error: {e.message}'})}\n\n"
-    except Exception as e:
-        logger.exception("Unexpected error during streaming")
-        yield f"data: {json.dumps({'type': 'error', 'error': f'An error occurred: {str(e)}'})}\n\n"
-
-
 @router.post("/", response_model=None)
 async def chat(
     request: ChatRequest,
@@ -283,90 +211,30 @@ async def chat(
 ) -> StreamingResponse | ChatResponse:
     """Process a chat message with optional streaming."""
     settings = get_settings()
-
-    # Use client-provided API key first, fall back to server-configured key
-    api_key = x_api_key or settings.anthropic_api_key
-
-    if not api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="API key required. Please provide your Anthropic API key.",
-        )
-
-    client = anthropic.AsyncAnthropic(api_key=api_key)
     tools = get_tools_for_claude()
 
-    # Convert messages to API format
-    api_messages = [
-        {"role": msg.role, "content": msg.content}
-        for msg in request.messages
+    try:
+        provider = get_provider(x_api_key, settings, _execute_tool)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="No LLM provider configured. Set OPENROUTER_API_KEY or provide an Anthropic key.",
+        ) from exc
+
+    api_messages: list[dict[str, Any]] = [
+        {"role": msg.role, "content": msg.content} for msg in request.messages
     ]
 
     if request.stream:
         return StreamingResponse(
-            _stream_chat_response(client, api_messages, tools),
+            provider.stream_chat(api_messages, tools, _build_system_prompt()),
             media_type="text/event-stream",
         )
 
-    # Non-streaming response
-    system_prompt = _build_system_prompt()
-
-    response = await client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4096,
-        system=system_prompt,
-        messages=api_messages,
-        tools=tools,
+    text, tool_calls = await provider.chat(
+        api_messages, tools, _build_system_prompt()
     )
-
-    # Handle tool calls
-    tool_calls_made = []
-    while response.stop_reason == "tool_use":
-        tool_calls = [
-            block for block in response.content
-            if hasattr(block, "type") and block.type == "tool_use"
-        ]
-
-        tool_results = []
-        for tool_call in tool_calls:
-            tool_calls_made.append({
-                "name": tool_call.name,
-                "input": tool_call.input,
-            })
-
-            result = _execute_tool(tool_call.name, tool_call.input)
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tool_call.id,
-                "content": result,
-            })
-
-        # Continue with tool results
-        api_messages.append({"role": "assistant", "content": response.content})
-        api_messages.append({"role": "user", "content": tool_results})
-
-        response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=system_prompt,
-            messages=api_messages,
-            tools=tools,
-        )
-
-    # Extract final text response
-    final_text = ""
-    for block in response.content:
-        if hasattr(block, "text"):
-            final_text += block.text
-
-    return ChatResponse(
-        response=final_text,
-        tool_calls=tool_calls_made,
-        usage={
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-        },
-    )
+    return ChatResponse(response=text, tool_calls=tool_calls)
 
 
 @router.post("/complete")

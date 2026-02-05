@@ -62,6 +62,31 @@ class DerivedParameterResult:
             "value_count": len(self.values) - self.missing_count,
         }
 
+    def format_for_display(self) -> str:
+        """Format as human-readable string."""
+        valid = self.values.dropna()
+        n_valid = len(valid)
+
+        lines = [
+            f"**{self.parameter}** (source: {self.source}, n={n_valid})",
+        ]
+
+        if n_valid > 0:
+            lines.append(f"  Mean: {float(valid.mean()):.4g}")
+            lines.append(f"  Median: {float(valid.median()):.4g}")
+            lines.append(f"  Range: [{float(valid.min()):.4g}, {float(valid.max()):.4g}]")
+
+        lines.append(f"  Completeness: {self.completeness:.1%}")
+
+        if self.formula:
+            lines.append(f"  Formula: {self.formula}")
+        if self.assumptions:
+            lines.append("  Assumptions: " + "; ".join(
+                f"{k}={v}" for k, v in self.assumptions.items()
+            ))
+
+        return "\n".join(lines)
+
 
 def compute_derived_parameter(
     df: pd.DataFrame,
