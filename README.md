@@ -38,6 +38,11 @@ Modern LLMs like ChatGPT and Claude have agent modes and code execution — so w
 - **Conflate categories**: "spider pulsars" (black widows and redbacks with confirmed companion ablation) are a *subset* of MSPs with PB < 1 day, but an LLM will often treat them as equivalent
 - **Punt**, telling you to go query the catalogue yourself
 
+| ChatGPT | Claude | Gemini |
+|:---:|:---:|:---:|
+| ![ChatGPT](docs/images/chatgpt.png) | ![Claude](docs/images/claude.png) | ![Gemini](docs/images/gemini.png) |
+| *Punts — tells you to query the catalogue yourself* | *Cites stale literature and conflates spider pulsars with the raw query* | *Hallucates "250 to 300" with false confidence* |
+
 Even with web search, the precise answer (174) does not appear in any published paper — it is a live database query whose result changes as new pulsars are discovered. This is the class of question where RAG over a structured catalogue provides value that a general-purpose LLM cannot replicate.
 
 
