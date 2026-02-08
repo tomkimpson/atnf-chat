@@ -82,7 +82,7 @@ export function Header({ tier, maskedKey, onApiKeyClick, onLogoClick }: HeaderPr
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
             <a
-              href="https://github.com/tkimpson/atnf-chat"
+              href="https://github.com/tomkimpson/atnf-chat"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
