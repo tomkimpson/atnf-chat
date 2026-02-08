@@ -63,6 +63,27 @@ class AnthropicProvider(LLMProvider):
         self.model = model
         self.tool_executor = tool_executor
 
+    @staticmethod
+    def _friendly_anthropic_error(exc: anthropic.APIError) -> str:
+        """Return a user-facing error message for common Anthropic errors."""
+        status = getattr(exc, "status_code", None)
+        if status == 401:
+            return (
+                "Your Anthropic API key is invalid or expired. "
+                "Please check your key at console.anthropic.com/settings/keys."
+            )
+        if status == 429:
+            return (
+                "You've hit the Anthropic rate limit. "
+                "Please wait a moment and try again."
+            )
+        if status == 529:
+            return (
+                "The Anthropic API is temporarily overloaded. "
+                "Please try again in a few moments."
+            )
+        return f"API error: {exc.message}"
+
     async def stream_chat(
         self,
         messages: list[dict[str, Any]],
@@ -127,7 +148,8 @@ class AnthropicProvider(LLMProvider):
 
         except anthropic.APIError as e:
             logger.exception("Anthropic API error during streaming")
-            yield f"data: {json.dumps({'type': 'error', 'error': f'API error: {e.message}'})}\n\n"
+            error_msg = self._friendly_anthropic_error(e)
+            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
         except Exception as e:
             logger.exception("Unexpected error during streaming")
             yield f"data: {json.dumps({'type': 'error', 'error': f'An error occurred: {e!s}'})}\n\n"
@@ -262,6 +284,42 @@ class OpenRouterProvider(LLMProvider):
             " for higher limits."
         )
 
+    def _friendly_error(self, exc: openai.APIError) -> str:
+        """Return a user-facing error message for common OpenRouter errors."""
+        status = getattr(exc, "status_code", None)
+
+        if status == 401:
+            if self.is_shared_key:
+                return (
+                    "The free tier is temporarily unavailable due to an "
+                    "authentication issue. Please try again later, or "
+                    "provide your own API key for uninterrupted access."
+                )
+            return (
+                "Your OpenRouter API key appears to be invalid or expired. "
+                "Please check your key at openrouter.ai/settings/keys "
+                "or provide an Anthropic API key instead."
+            )
+
+        if status == 402:
+            if self.is_shared_key:
+                return (
+                    "The free tier has run out of credits and is temporarily "
+                    "unavailable. To continue chatting, you can provide your "
+                    "own OpenRouter API key (free at openrouter.ai/settings/keys) "
+                    "or an Anthropic API key."
+                )
+            return (
+                "Your OpenRouter account has insufficient credits for this "
+                "request. Please add credits at openrouter.ai/settings/credits "
+                "or provide an Anthropic API key instead."
+            )
+
+        if status == 429:
+            return self._rate_limit_hint().lstrip(" —")
+
+        return f"API error: {exc}"
+
     @staticmethod
     def _parse_tool_args(arguments: str) -> dict[str, Any]:
         """Parse JSON tool call arguments, returning empty dict on failure."""
@@ -359,10 +417,7 @@ class OpenRouterProvider(LLMProvider):
 
         except openai.APIError as e:
             logger.exception("OpenRouter API error during streaming")
-            error_msg = str(e)
-            if "rate limit" in error_msg.lower():
-                error_msg += self._rate_limit_hint()
-            yield f"data: {json.dumps({'type': 'error', 'error': f'API error: {error_msg}'})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': self._friendly_error(e)})}\n\n"
         except Exception as e:
             logger.exception("Unexpected error during streaming")
             yield f"data: {json.dumps({'type': 'error', 'error': f'An error occurred: {e!s}'})}\n\n"
