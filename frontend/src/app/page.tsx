@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ApiKeyModal, Chat, Header } from "../components";
 import { useApiKey } from "../lib/useApiKey";
 
@@ -10,10 +10,11 @@ export default function Home() {
   const [chatKey, setChatKey] = useState(0);
 
   // Show modal on first visit (no tier preference stored yet)
-  const shouldPromptForKey =
-    isLoaded &&
-    typeof window !== "undefined" &&
-    !localStorage.getItem("atnf-chat-tier");
+  useEffect(() => {
+    if (isLoaded && typeof window !== "undefined" && !localStorage.getItem("atnf-chat-tier")) {
+      setShowApiKeyModal(true);
+    }
+  }, [isLoaded]);
 
   // Reset chat by changing key to force remount
   const handleLogoClick = useCallback(() => {
@@ -37,7 +38,7 @@ export default function Home() {
       </main>
 
       <ApiKeyModal
-        isOpen={showApiKeyModal || shouldPromptForKey}
+        isOpen={showApiKeyModal}
         onClose={() => setShowApiKeyModal(false)}
         onSave={setApiKey}
         onTierSelect={setTier}
