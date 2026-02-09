@@ -19,7 +19,6 @@ This means you get the convenience of natural language with the accuracy of dire
 - **Grounded Responses**: Every answer is backed by real catalogue data, not LLM training data
 - **Natural Language Queries**: Ask questions in plain English
 - **Live Data Access**: Queries the current ATNF catalogue via psrqpy
-- **Interactive Visualizations**: P-Pdot diagrams, sky maps, and more with Plotly
 - **Scientific Safety**: Explicit null handling and data quality warnings
 - **Reproducible**: All queries exportable as validated Python code
 
